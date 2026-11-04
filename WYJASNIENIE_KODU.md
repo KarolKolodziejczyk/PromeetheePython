@@ -12,7 +12,7 @@ data/problem.json          ← dane z Task 1 + parametry PROMETHEE
         │
         ▼
 promethee/core.py          ← funkcje preferencji, PROMETHEE I i II, WSM (P×W)
-promethee/sensitivity.py   ← analiza wrażliwości (wagi, Monte Carlo, progi)
+promethee/sensitivity.py   ← analiza wrażliwości (wagi, progi)
 promethee/fuzzy.py         ← F-PROMETHEE (niepewne wartości jako liczby rozmyte)
 promethee/efficiency.py    ← rozszerzenie: Efficiency measuring
         │
@@ -243,24 +243,7 @@ Poniżej 0.148 wygrywa H2D.
 Zmienia wagę jednego kryterium od 0 do 1 w 101 krokach. Na tej podstawie
 powstaje wykres `05_weight_sweeps.png`.
 
-### 3.4 `monte_carlo` (linie 90–120) – akceptowalność pozycji
-
-Losujemy 20 000 wektorów wag i dla każdego liczymy ranking. Są dwa tryby:
-
-* `"local"`: każda waga bazowa jest mnożona przez losową liczbę z przedziału
-  U(1 − spread, 1 + spread), potem wagi są normalizowane. Używamy ±20 % i
-  ±50 %, co odpowiada pytaniu „moje wagi są niedokładne”.
-* `"simplex"`: rozkład Dirichleta(1, …, 1), czyli wagi równomiernie losowe
-  na całym zbiorze dopuszczalnych wag. Odpowiada to pytaniu „nie wiem nic o
-  wagach”.
-
-Trik wydajnościowy: `PHI = W @ phi_j.T`. Funkcje preferencji nie zależą od
-wag, więc wszystkie 20 000 rankingów to jedno mnożenie macierzy.
-
-Wynik `acc[a, r]` to odsetek losowań, w których alternatywa a była na
-miejscu r + 1. Dla U1 przy ±20 % wynosi 100 % na 1. miejscu.
-
-### 3.5 `threshold_sensitivity` i `single_threshold_sweep` (linie 123–162)
+### 3.4 `threshold_sensitivity` i `single_threshold_sweep` (linie 123–162)
 
 * Mnożymy **wszystkie** progi q, p, s przez 0.25, 0.5, …, 2 i liczymy
   ranking od nowa.
@@ -272,7 +255,7 @@ miejscu r + 1. Dla U1 przy ±20 % wynosi 100 % na 1. miejscu.
 Tutaj trzeba liczyć PROMETHEE od nowa, bo zmiana progów zmienia macierze P.
 `copy.deepcopy` zapewnia, że oryginalne kryteria zostają nienaruszone.
 
-### 3.6 `promethee/fuzzy.py` – F-PROMETHEE (wymaganie 5a)
+### 3.5 `promethee/fuzzy.py` – F-PROMETHEE (wymaganie 5a)
 
 Niepewne wartości z macierzy to **trójkątne liczby rozmyte (l; m; u)**:
 * cena ±5 %, a dla U1 (899; 899; 1099), bo to promocja;
@@ -344,14 +327,6 @@ kombinację kilku alternatyw (np. flotę samochodów dla firmy). Doktor pisze,
 że ma sens tylko wtedy, gdy łączy się alternatywy. Ja kupuję jedną drukarkę,
 więc PROMETHEE V nie pasuje.
 
-### 4.5 `efficiency_acceptability` – odporność
-
-Losuje 20 000 zestawów wag (jak Monte Carlo z punktu 3.4) i liczy, jak często
-każda drukarka jest efektywna:
-* U1: 100 % (zawsze, bo jest najtańsza),
-* H2D: prawie 100 %,
-* Prusa: prawie nigdy.
-
 ---
 
 ## 5. `run_analysis.py` – uruchomienie całości
@@ -364,7 +339,7 @@ i fragment `results.md`.
 | `data` | tabela wejściowa i parametry kryteriów | `performance_table.csv`, `criteria_parameters.csv` |
 | `PROMETHEE I/II` | φ⁺, φ⁻, φ, ranking; macierz π; φⱼ; relacje PROMETHEE I | `promethee_flows.csv`, `01_…`, `02_…`, `03_…` |
 | `ranking comparison` | ranking PROMETHEE i WSM dla 7 zestawów wag, τ Kendalla, ρ Spearmana | `ranking_comparison_*.csv`, `04_…` |
-| `sensitivity: weights` | przedziały stabilności, wykresy wag, Monte Carlo | `weight_stability_intervals.csv`, `05_…`, `06_…` |
+| `sensitivity: weights` | przedziały stabilności, wykresy wag | `weight_stability_intervals.csv`, `05_…` |
 | `sensitivity: thresholds` | skalowanie progów i wariant „usual” | `threshold_sensitivity.csv`, `07_…` |
 | `what-if` | cena H2D od 700 do 2500 € w 361 krokach; punkt zmiany zwycięzcy liczony interpolacją liniową (≈ 1096 €) | `what_if.csv`, `08_…` |
 | `F-PROMETHEE` | macierz TFN, trójkątne przepływy φ~ = (l; m; u), ranking według środka ciężkości | `fuzzy_decision_matrix.csv`, `fuzzy_promethee.csv`, `11_…` |
@@ -389,7 +364,6 @@ Uruchomienie: `python run_analysis.py` (domyślnie `data/problem.json`) albo
 | `test_hand_computed_example` | mały przykład 3 × 2 policzony ręcznie: π, φ⁺, φ⁻, φ i relacje PROMETHEE I |
 | `test_net_flow_is_weighted_unicriterion_flows` | φ = Σ wⱼ φⱼ oraz Σ φ = 0 |
 | `test_stability_intervals_are_exact` | ranking jest stały wewnątrz przedziału, a zmienia się tuż za granicą |
-| `test_monte_carlo_rows_sum_to_one` | macierz akceptowalności jest poprawna: wiersze i kolumny sumują się do 1 |
 | `test_wsm_reproduces_task1_spreadsheet` | WSM daje dokładnie wyniki z arkusza Task 1 |
 | `test_efficiency_and_budget_choice` | φ korzyści i kosztu składają się na φ; najtańsza i najlepsza są efektywne; przy zbyt małym budżecie nic nie jest wybierane, a bez limitu wybierana jest najlepsza |
 | `test_kendall_tau` | τ = 1 dla identycznych i −1 dla odwróconych rankingów |
@@ -413,7 +387,7 @@ Uruchomienie: `python -m pytest -q`.
 
 **Dlaczego własny kod, a nie Visual PROMETHEE?**
 Zadanie pozwala na jedno albo drugie. Własny kod pozwala zrobić analizy,
-których VP nie ma: dokładne przedziały stabilności, Monte Carlo, F-PROMETHEE, efficiency i
+których VP nie ma: dokładne przedziały stabilności, F-PROMETHEE, efficiency i
 analizę ceny H2D. Zgodnie z instrukcją nie odtwarzam wyników VP, w tym
 płaszczyzny GAIA.
 
@@ -465,9 +439,5 @@ trzeba przeszukiwać siatki wartości.
   a nie rozkłady prawdopodobieństwa, których nie znam. Trójkątna liczba
   rozmyta opisuje to naturalnie.
 * Doktor zaleca F-PROMETHEE osobom, które piszą własny kod w Pythonie.
-* Monte Carlo na wagach zostało jako zwykła analiza wrażliwości (5.2).
-
-**Co oznacza 62 % dla H2D w Monte Carlo przy losowych wagach?**
-Gdyby wagi były zupełnie przypadkowe, H2D wygrywałaby najczęściej, bo
-obiektywnie jest najmocniejszą maszyną. U1 wygrywa dzięki moim priorytetom:
-cena i liczba dysz mają razem 55 % wagi.
+* Niepewność wag pokrywają rozmyte wagi ±10 % w F-PROMETHEE i przedziały
+  stabilności wag, więc osobne Monte Carlo nie jest potrzebne.
