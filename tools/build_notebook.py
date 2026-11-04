@@ -1,4 +1,4 @@
-"""Build PROMETHEE_Colab.ipynb – a self-contained notebook for Google Colab.
+"""Build KK_Task2_Efficency.ipynb – a self-contained notebook for Google Colab.
 
 The notebook embeds the current source files (via %%writefile), so it runs
 without cloning the repository. Re-run after changing the code:
@@ -33,10 +33,9 @@ def code(text: str, hidden: bool = False) -> dict:
             "source": text.strip("\n").splitlines(True)}
 
 
-def note(text: str) -> dict:
-    """Short personal study note (Polish) shown as a quote block."""
-    body = "\n".join("> " + ln if ln.strip() else ">" for ln in text.strip("\n").splitlines())
-    return md("> **Notatka:**\n>\n" + body)
+def interp(text: str) -> dict:
+    """Short interpretation of the result right above it."""
+    return md("**Interpretation.** " + text.strip("\n"))
 
 
 def show(title: str, fig: str | None = None, csv: str | None = None, note: str = "") -> dict:
@@ -52,47 +51,8 @@ def show(title: str, fig: str | None = None, csv: str | None = None, note: str =
 
 cells = [
     md("## 0. Code (PROMETHEE package) – run, no need to read"),
-    note("""
-Tu tylko **zapisuję pliki z kodem**, nic się jeszcze nie liczy.
-- `core.py`: sama metoda PROMETHEE (funkcje preferencji → π(a,b) → φ⁺, φ⁻, φ) i WSM z Task 1
-- `sensitivity.py`: analiza wrażliwości (wagi, Monte Carlo, progi)
-- `efficiency.py`: rozszerzenie Efficiency measuring (co dostaję za swoje pieniądze)
-- `fuzzy.py`: F-PROMETHEE, niepewne wartości jako trójkątne liczby rozmyte (TFN)
-- `run_analysis.py`: odpala wszystko po kolei i zapisuje tabele/wykresy do `results/`
-"""),
     code("import os\nos.makedirs('promethee', exist_ok=True)\nos.makedirs('data', exist_ok=True)"),
 ]
-NOTES_BEFORE = {
-    "promethee/core.py": """
-Najważniejszy plik, tu jest PROMETHEE:
-- `_usual`, `_v_shape`, `_level`, `_linear`…: **funkcje preferencji**, zamieniają różnicę d = g(a) − g(b) na liczbę 0–1 (progi q, p)
-- `Criterion.preference`: dla kryteriów *min* (cena, hałas) odwraca znak różnicy
-- `preference_matrices`: dla każdego kryterium porównuje **każdą parę drukarek** → P_j(a,b)
-- `promethee`: **π(a,b) = Σ w_j·P_j(a,b)**, potem **φ⁺ = średnia wiersza**, **φ⁻ = średnia kolumny**, **φ = φ⁺ − φ⁻**
-- `promethee_I`: ranking częściowy (P / I / R) z φ⁺ i φ⁻ osobno
-- `weighted_sum`: WSM z Task 1 (min/x, x/max) do porównania
-""",
-    "promethee/sensitivity.py": """
-Wrażliwość. Trik: **φ = Σ w_j·φ_j** (φ jest liniowe w wagach), więc:
-- `stability_intervals`: dokładnie liczy, przy jakiej wadze drukarki zamieniają się miejscami
-- `monte_carlo`: losuje 20 000 zestawów wag i patrzy, jak często która drukarka jest 1., 2., …
-- `threshold_sensitivity`: zmienia progi q, p i sprawdza, czy ranking się trzyma
-""",
-    "promethee/efficiency.py": """
-Rozszerzenie **Efficiency measuring**:
-- `split_flows`: dzieli przepływ na **φ korzyści** (5 kryteriów bez ceny) i **φ kosztu** (cena)
-- `efficient_set`: drukarka jest **efektywna**, jeśli żadna inna nie jest jednocześnie lepsza i tańsza
-- `best_within_budget` / `budget_sweep`: najlepsza drukarka, na jaką stać mnie przy danym budżecie (odczyt z granicy efektywności)
-""",
-    "promethee/fuzzy.py": """
-**F-PROMETHEE** na trójkątnych liczbach rozmytych (l; m; u). Każdy krok PROMETHEE liczę na trzech liczbach naraz:
-różnica → preferencja → π → φ⁺, φ⁻ → **φ~ = (l; m; u)**, a ranking robię według środka ciężkości (l+m+u)/3.
-""",
-    "run_analysis.py": """
-Skrypt „dyrygent”: wczytuje JSON, woła funkcje z `promethee/` sekcja po sekcji
-(ranking → porównanie z WSM → wrażliwość → F-PROMETHEE → what-if H2D → efficiency) i zapisuje wyniki.
-""",
-}
 for rel in EMBED:
     src = (ROOT / rel).read_text(encoding="utf-8")
     if rel == "data/problem.json":
@@ -100,152 +60,137 @@ for rel in EMBED:
 ## 1. Problem data
 
 Printers, criteria (direction, preference function, thresholds q / p / s), weights,
-weight scenarios, the what-if setup, the fuzzy values and the efficiency settings.
+weight scenarios, the fuzzy values and the efficiency settings.
 """))
-        cells.append(note("""
-Dane z Task 1 + **moje wybory dla PROMETHEE** (funkcja preferencji i progi):
-
-| kryterium | funkcja | q | p | dlaczego |
-|---|---|---|---|---|
-| cena (min) | linear | 50 € | 300 € | cena jest dla mnie bardzo ważna: do 50 € bez różnicy, już 300 € taniej (~12% budżetu) = zdecydowanie lepsza |
-| hałas (min) | linear | 2 dB | 7 dB | w Task 1: różnice 1–3 dB nic nie znaczą (różne źródła) |
-| prędkość (max) | linear | 50 | 400 | małe różnice niezauważalne |
-| objętość (max) | linear | 2 | 20 | 20 dm³ to inna klasa drukarki |
-| łatwość (max) | level | 0.5 | 1.5 | skala 1–5: 1 pkt różnicy → 0.5, 2+ pkt → 1 |
-| dysze (max) | v-shape | – | 3 | każda dysza więcej się liczy (1/3 za dyszę) |
-
-**q** = poniżej tej różnicy nie obchodzi mnie to, **p** = od tej różnicy „zdecydowanie lepsza”.
-Wagi bazowe = metoda 1 z Task 1 (punkty): 0.30 / 0.15 / 0.10 / 0.12 / 0.08 / 0.25.
-"""))
-    elif rel in NOTES_BEFORE:
-        cells.append(note(NOTES_BEFORE[rel]))
     cells.append(code(f"%%writefile {rel}\n{src}"))
 
 cells += [
     md("## 2. Run the analysis"),
-    note("Jedna komenda liczy wszystko (ranking, porównanie, wrażliwość, F-PROMETHEE, efficiency). Wyniki → folder `results/`."),
     code("!python run_analysis.py > /dev/null && echo 'done – results in results/'"),
     code("import pandas as pd\nfrom IPython.display import Markdown, Image, display\n"
          "pd.set_option('display.width', 200)"),
-    md("## 3. PROMETHEE II and PROMETHEE I"),
-    show("Performance table", csv="performance_table.csv"),
-    note("Dane wejściowe z Task 1, tutaj nic nie jest jeszcze policzone."),
-    show("Criteria parameters and base weights", csv="criteria_parameters.csv"),
-    show("PROMETHEE II – flows and ranking", "01_net_flows.png", "promethee_flows.csv"),
-    note("""
-**Kluczowy wynik.** φ⁺ = jak bardzo drukarka przewyższa inne, φ⁻ = jak bardzo inne przewyższają ją,
-**φ = φ⁺ − φ⁻** → ranking PROMETHEE II: **U1 > K2 Plus > H2D > Prusa**.
-U1 ma dużą przewagę (φ = +0.295, jedyna dodatnia), K2 i H2D prawie remis (różnica 0.014).
+
+    md("## 3. PROMETHEE I and II"),
+    show("Performance table (from Task 1)", csv="performance_table.csv"),
+    show("Preference functions and weights", csv="criteria_parameters.csv"),
+    interp("""
+The data and the weights (method 1, points) are the same as in Task 1. What is new for PROMETHEE
+is the preference function of each criterion, which says how big a difference has to be before it
+matters to me. **q** is the difference I ignore and **p** is the difference from which one printer is
+clearly better. For example, for noise q = 2 dB, because my noise values come from different
+sources and 1–2 dB is probably just measurement noise, and p = 7 dB, which you clearly hear.
+Price is very important to me, so already 300 € (p) is a decisive difference. Ease of use is my
+own 1–5 score, so I used the level function (1 point = half preference, 2 points = full).
 """),
-    show("Aggregated preference indices π(a, b)", csv="preference_index_matrix.csv",
-         note="π(a, b) = weighted degree to which row printer is preferred to column printer"),
-    note("""
-Stąd biorą się przepływy. Np. **π(U1, H2D) = 0.467**: cena 0.30·1 (U1 tańsza o 1226 € > p = 300 €) + dysze 0.25·(2/3).
-φ⁺(U1) = średnia z **wiersza** U1 = (0.576 + 0.467 + 0.569)/3 = 0.537;
-φ⁻(U1) = średnia z **kolumny** U1 = (0.224 + 0.338 + 0.164)/3 = 0.242.
+    show("PROMETHEE II – flows and complete ranking", "01_net_flows.png", "promethee_flows.csv"),
+    interp("""
+φ⁺ shows how much a printer is better than the others and φ⁻ how much the others are better than
+it. The net flow φ = φ⁺ − φ⁻ gives the ranking: **Snapmaker U1 > Creality K2 Plus > Bambu H2D >
+Prusa CORE One**. U1 is the only printer with a positive net flow (+0.295) and it is far ahead.
+K2 Plus and H2D are almost tied (−0.044 vs −0.059), so I would not read too much into which of
+them is 2nd.
 """),
     show("PROMETHEE I – partial ranking", "02_promethee_I.png", "promethee_I_relations.csv",
          "P = row outranks column, `-` = column outranks row, R = incomparable"),
-    note("""
-PROMETHEE I patrzy na φ⁺ i φ⁻ **osobno**. Lepsza tylko gdy wyższe φ⁺ **i** niższe φ⁻.
-Gdy jedno mówi „lepsza”, a drugie „gorsza” → **R (nieporównywalne)**, na wykresie linie się krzyżują.
-**U1 jest lepsza od wszystkich trzech** (najwyższe φ⁺ i najniższe φ⁻), więc PROMETHEE I potwierdza wynik.
-H2D jest nieporównywalna z K2 i Prusą: świetna w wielu rzeczach, ale bardzo droga.
+    interp("""
+In PROMETHEE I a printer is better only if it has a higher φ⁺ **and** a lower φ⁻ at the same time.
+U1 is better than all three others in this sense, so PROMETHEE I agrees with PROMETHEE II about the
+winner. H2D is incomparable (R) with K2 Plus and with the Prusa: it is very good in speed, ease of
+use and noise, but much more expensive, so φ⁺ and φ⁻ say different things (the lines cross).
 """),
-    show("Unicriterion net flows (strengths / weaknesses)", "03_unicriterion_profiles.png",
+    show("Strengths and weaknesses (unicriterion net flows)", "03_unicriterion_profiles.png",
          "unicriterion_net_flows.csv"),
-    note("""
-φ_j = przepływ liczony tylko na jednym kryterium → **mocne (niebieskie) i słabe (czerwone) strony**.
-φ = Σ w_j·φ_j. U1 wygrywa, bo jest mocna na cenie i dyszach, czyli moich dwóch najważniejszych kryteriach (55% wagi).
+    interp("""
+This shows why U1 wins: it is the best on price and on nozzles, which are my two most important
+criteria (together 55 % of the weight). It is the loudest and slowest printer and has a small
+build volume, but these criteria have lower weights. H2D is best on speed and ease of use but has
+the worst price.
 """),
-    md("## 4. Comparison of rankings (weight scenarios, PROMETHEE vs WSM P × W)"),
-    show("Ranks under every method and weight scenario", "04_ranking_comparison.png",
+
+    md("## 4. Comparison with the WSM from Task 1"),
+    show("Ranks of PROMETHEE II and WSM for different weights", "04_ranking_comparison.png",
          "ranking_comparison_ranks.csv"),
-    note("""
-Górna część = PROMETHEE, dolna = WSM z Task 1, dla 7 zestawów wag.
-- M1 i M2 → U1 w obu metodach (wynik Task 1 potwierdzony)
-- równe wagi / cena mniej ważna → H2D (PROMETHEE), WSM często dalej U1
-- duże wydruki → K2 Plus; bez multi-colour → U1, ale prawie remis z K2
-- Prusa zawsze ostatnia
+    interp("""
+With my real weights (method 1 and method 2) both PROMETHEE and the WSM choose **U1**, so the
+result of Task 1 is confirmed. The methods differ in the details: with method 1 the WSM has H2D in
+2nd place, PROMETHEE has K2 Plus. When price matters less ("Price matters less", "0.2 / 0.15") the
+WSM still chooses U1, but PROMETHEE chooses H2D. As I understand it, this is because the WSM counts
+every difference proportionally, while PROMETHEE compares pairs and ignores small differences
+(below q) and caps big ones (above p). For example U1's advantage of having 4 nozzles counts a lot
+in the WSM normalisation, but in PROMETHEE it is limited by the preference function.
 """),
-    show("Scores", csv="ranking_comparison_scores.csv",
-         note="Net flow φ for PROMETHEE, Task 1 WSM score for P × W"),
-    note("""
-**Różnica WSM vs PROMETHEE:** WSM sumuje znormalizowane wartości (każda różnica liczy się proporcjonalnie).
-PROMETHEE porównuje **pary** i używa progów: małe różnice (< q) pomija, duże (> p) „ucina” na 1.
-Dlatego przy „price matters less” WSM dalej wybiera U1, a PROMETHEE już H2D.
-"""),
+
     md("## 5. Sensitivity analysis"),
-    show("5.1 Weight stability intervals", "05_weight_sweeps.png", "weight_stability_intervals.csv"),
-    note("""
-Zmieniam wagę **jednego** kryterium (reszta proporcjonalnie). Niebieski pas = ranking się nie zmienia.
-U1 zostaje 1. dla wagi ceny ≥ 0.148 i **dowolnej** wagi dysz; inne kryteria musiałyby mieć co najmniej 2.4× większą wagę.
+    show("Weight stability intervals", "05_weight_sweeps.png", "weight_stability_intervals.csv"),
+    interp("""
+Here I change the weight of one criterion and keep the others in proportion. U1 stays the winner
+for every price weight above 0.148 (mine is 0.30) and for any nozzle weight. The other criteria
+would need about 2.4 times or more of their weight to change the winner. So the winner is stable;
+only the order of places 2 and 3 changes easily.
 """),
-    show("5.2 Monte-Carlo rank acceptability (±20 % / ±50 % / any weights)", "06_rank_acceptability.png"),
-    note("""
-Losowe wagi: ±20% wokół moich → U1 1. w 100%; ±50% → 97%; zupełnie losowe → H2D 62%.
-Czyli: **H2D to obiektywnie najmocniejsza drukarka, U1 wygrywa przez moje priorytety** (cena + dysze).
+    show("Random weights (Monte Carlo)", "06_rank_acceptability.png"),
+    interp("""
+With weights randomly changed by ±20 % around mine, U1 is first in 100 % of cases, and with ±50 %
+in 97 %. With completely random weights H2D wins most often (62 %). So H2D is probably the
+"objectively" strongest printer, and U1 wins because of my priorities (low price, multi-colour).
 """),
-    code('for f in ["local20", "local50", "simplex"]:\n'
-         '    display(Markdown(f"**{f}**"))\n'
-         '    display(pd.read_csv(f"results/rank_acceptability_{f}.csv", index_col=0).round(3))'),
-    show("5.3 Thresholds and preference functions", "07_threshold_sweeps.png", "threshold_sensitivity.csv"),
-    note("Progi q, p to moja subiektywna decyzja, więc sprawdzam: mnożę wszystkie ×0.25 … ×2 → **U1 zawsze 1.** Zmieniają się tylko miejsca 2–3."),
-    show("5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers", csv="fuzzy_decision_matrix.csv"),
-    note("""
-Niepewne wartości jako trójkąty **(min; wartość; max)**: cena ±5% (U1: 899–1099 €, promocja),
-hałas ±2 dB (K2: producent podaje 45 dB), łatwość ±0.5 (moja ocena). Reszta bez zmian.
-Wagi też są trójkątami: **±10%**, np. cena (0.27; 0.30; 0.33).
+    show("Changing the thresholds q and p", csv="threshold_sensitivity.csv"),
+    interp("""
+The thresholds are my own choice, so I multiplied all of them by 0.25 to 2. U1 is first in every
+case, only places 2–4 change. So my choice of q and p does not decide the winner.
 """),
-    show("F-PROMETHEE – fuzzy net flows", "11_f_promethee.png", "fuzzy_promethee.csv"),
-    note("""
-Każdy krok PROMETHEE liczę na trzech liczbach (l; m; u), więc wynik to też trójkąt. **m = zwykłe φ.**
-Ranking według środka ciężkości (l+m+u)/3: **U1 > K2 > H2D > Prusa**, taki sam jak bez niepewności.
-U1 to jedyna drukarka z całym trójkątem po dodatniej stronie (l = +0.005).
+
+    md("## 6. Extension (4c) – Efficiency measuring"),
+    show("Efficient frontier – input: price, output: benefit", "09_efficiency_frontier.png",
+         "efficiency.csv"),
+    interp("""
+My goal in Task 1 was "the printer that gives me the most for my money", so I chose efficiency
+measuring. The input is the price and the outputs are the other five criteria (their PROMETHEE
+flow = "benefit"). A printer is efficient if no other printer is cheaper and better at the same
+time. Only **U1** (cheapest) and **H2D** (best benefit) are efficient. **K2 Plus and Prusa are
+dominated by U1**: U1 is cheaper and gives more. So the real choice is only between U1 and paying
+1226 € more for H2D. Because price is an important criterion for me, I stay with U1.
 """),
-    show("5.5 What if the Bambu H2D goes on sale?", "08_what_if.png", "what_if.csv"),
-    note("""
-Kontynuacja sekcji 6 z Task 1: H2D wygrywa, jeśli kosztuje **< ok. 1096 €** (~48% taniej).
-WSM w Task 1 mówił, że H2D nie wygrywa nawet przy cenie U1, więc tu PROMETHEE daje inny wniosek.
-Powyżej ~1580 € linia H2D jest płaska: różnica ceny > p = 300 €, więc preferencja i tak = 1.
+
+    md("## 7. Uncertainty (5a) – F-PROMETHEE"),
+    show("Fuzzy decision matrix (triangular fuzzy numbers l; m; u)", csv="fuzzy_decision_matrix.csv"),
+    interp("""
+I replaced the values I am not sure about with triangular fuzzy numbers (lowest; used value;
+highest): price ±5 % (different shops) and U1 (899; 899; 1099) because 899 € is a sale price;
+noise ±2 dB (different sources) and K2 Plus (45; 50; 52) because the manufacturer says 45 dB;
+ease of use ±0.5 because it is my own opinion. The weights are fuzzy too, ±10 %.
+Speed, volume and nozzles stay exact (manufacturer data).
 """),
-    md("## 6. Extension – Efficiency measuring"),
-    note("""
-**Dlaczego Efficiency:** cel z Task 1 to *„find the printer that gives me the most for my money”*.
-Dzielę kryteria na **wejście / koszt** (cena) i **wyjścia / korzyści** (hałas, prędkość, objętość, łatwość, dysze).
-Dla każdej drukarki liczę **φ korzyści** i **φ kosztu** (z tych samych przepływów co w rankingu).
-**Efektywna** = żadna inna nie jest jednocześnie lepsza i tańsza.
+    show("Fuzzy net flows and F-PROMETHEE ranking", "11_f_promethee.png", "fuzzy_promethee.csv"),
+    interp("""
+Every PROMETHEE step is done on the three numbers (l; m; u), so each printer gets a triangular
+net flow; the middle value m is the normal φ. Ranked by the centroid (l + m + u)/3 the order is the
+same as before: **U1 > K2 Plus > H2D > Prusa**. U1 is the only printer whose whole triangle is on
+the positive side, so even in the worst plausible case it is not worse than average. The K2 Plus
+triangle is the widest because its noise value is the most uncertain.
 """),
-    show("Efficient frontier – input (price) vs. output (benefit)", "09_efficiency_frontier.png", "efficiency.csv"),
-    note("""
-Efektywne są tylko **U1** (najtańsza, 899 €) i **H2D** (najlepsza, φ korzyści +0.345).
-**K2 Plus i Prusa są zdominowane:** U1 jest od nich tańsza i jednocześnie lepsza na pozostałych kryteriach.
-Przejście U1 → H2D: **+1226 €** za **+0.345** φ korzyści (ok. 355 € za każde +0.1).
+
+    md("## 8. Conclusion"),
+    md("""
+**I would buy the Snapmaker U1.** It wins in PROMETHEE II and PROMETHEE I, the same as the WSM in
+Task 1, it stays first when I change the weights or the thresholds, it is efficient and dominates
+the K2 Plus and the Prusa, and it still wins when the uncertain values are fuzzy. The Bambu H2D is
+the better machine overall, but for my priorities (price and multi-colour) it is not worth 1226 €
+more.
 """),
-    show("Reading the frontier – best printer for each budget", "10_budget_choice.png",
-         "budget_choice.csv"),
-    note("""
-Najlepsza drukarka (max φ korzyści), na jaką mnie stać: budżet 899–2124 € → **U1**; od 2125 € → **H2D**.
-K2 i Prusa nie wygrywają przy **żadnym** budżecie, bo są zdominowane.
-Przy 2500 €: gdyby cena była tylko limitem → H2D; ale cena to moje kryterium (waga 0.30) → **U1**.
-(To nie jest PROMETHEE V: ta metoda służy do łączenia kilku alternatyw w portfel, a ja kupuję jedną drukarkę.)
-"""),
-    show("Robustness – how often is a printer efficient under random weights", csv="efficiency_acceptability.csv"),
-    note("U1 i H2D są efektywne prawie zawsze (U1 zawsze, bo jest najtańsza). Prusa prawie nigdy, więc to najsłabszy wybór."),
-    md("## 7. Full auto-generated results (markdown) and download"),
-    code("display(Markdown(open('results/results.md', encoding='utf-8').read()))"),
-    code("# optional: download all tables and figures as a zip\n"
-         "import shutil\nshutil.make_archive('promethee_results', 'zip', 'results')\n"
-         "try:\n    from google.colab import files\n    files.download('promethee_results.zip')\n"
-         "except ImportError:\n    print('saved promethee_results.zip')"),
 ]
 
 # every table and figure produced by run_analysis.py must be shown somewhere
 shown = "".join("".join(c["source"]) for c in cells)
 produced = [p.name for p in (ROOT / "results").glob("*.csv")] + \
            [p.name for p in (ROOT / "results" / "figures").glob("*.png")]
-missing = [f for f in produced if f not in shown and
-           not f.startswith("rank_acceptability_")]  # shown by a loop
+# deliberately not shown (kept in results/ and REPORT.md, not needed in the notebook)
+HIDDEN = {"preference_index_matrix.csv", "ranking_comparison_scores.csv",
+          "rank_acceptability_local20.csv", "rank_acceptability_local50.csv",
+          "rank_acceptability_simplex.csv", "07_threshold_sweeps.png", "what_if.csv",
+          "08_what_if.png", "budget_choice.csv", "10_budget_choice.png",
+          "efficiency_acceptability.csv"}
+missing = [f for f in produced if f not in shown and f not in HIDDEN]
 if missing:
     raise SystemExit(f"not displayed in notebook: {missing}")
 
