@@ -5,8 +5,6 @@ Contents
 * ``stability_intervals`` – exact weight-stability intervals per criterion
   (for the complete ranking and for the first position).
 * ``weight_sweep``        – one-at-a-time sweep of a weight from 0 to 1.
-* ``monte_carlo``         – random weights (whole simplex or local perturbation),
-  rank-acceptability indices.
 * ``threshold_sensitivity`` – scaling of the preference thresholds q, p, s and
   replacement of all preference functions by the "usual" criterion.
 
@@ -87,39 +85,6 @@ def weight_sweep(phi_j: np.ndarray, w, j: int, steps: int = 101):
     return ts, flows
 
 
-def monte_carlo(phi_j: np.ndarray, w=None, n_samples: int = 20000, mode: str = "simplex",
-                spread: float = 0.2, seed: int = 42):
-    """Rank acceptability analysis.
-
-    mode="simplex": weights uniformly distributed on the whole simplex
-                    (Dirichlet(1,...,1)) – "what if we know nothing about weights".
-    mode="local":   each base weight multiplied by U(1-spread, 1+spread), then
-                    renormalised – "what if our weights are imprecise".
-
-    Returns (acceptability[n, n], mean_rank[n], weights_sample).
-    acceptability[a, r] = share of samples in which alternative a has rank r+1.
-    """
-    rng = np.random.default_rng(seed)
-    n, m = phi_j.shape
-    if mode == "simplex":
-        W = rng.dirichlet(np.ones(m), size=n_samples)
-    elif mode == "local":
-        w = normalise(w)
-        W = w * rng.uniform(1 - spread, 1 + spread, size=(n_samples, m))
-        W /= W.sum(axis=1, keepdims=True)
-    else:
-        raise ValueError(mode)
-    PHI = W @ phi_j.T                       # (samples, n)
-    order = np.argsort(-PHI, axis=1, kind="stable")
-    R = np.empty_like(order)
-    rows = np.arange(n_samples)[:, None]
-    R[rows, order] = np.arange(1, n + 1)
-    acc = np.zeros((n, n))
-    for r in range(n):
-        acc[:, r] = (R == r + 1).mean(axis=0)
-    return acc, R.mean(axis=0), W
-
-
 def threshold_sensitivity(X: np.ndarray, criteria: list[Criterion], w,
                           factors=(0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0)):
     """Scale all thresholds (q, p, s) by a factor and recompute the ranking.
@@ -160,6 +125,6 @@ def single_threshold_sweep(X, criteria, w, j: int, param: str, values):
     return np.array(flows)
 
 
-__all__ = ["stability_intervals", "weight_sweep", "monte_carlo",
+__all__ = ["stability_intervals", "weight_sweep",
            "threshold_sensitivity", "single_threshold_sweep", "phi_with_weight",
            "ranks_from_scores"]

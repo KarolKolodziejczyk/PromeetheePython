@@ -9,9 +9,9 @@ both weighting methods are copied unchanged from the Task 1 spreadsheet.
 not use Visual PROMETHEE. In line with the task rules, nothing from this code
 was put into VP, and no VP-specific output (e.g. the GAIA plane) was recreated.
 Because VP is not used, the sensitivity analysis is extended (Section 5:
-exact weight stability intervals, Monte-Carlo weight sensitivity and thresholds).
+exact weight stability intervals and thresholds).
 Uncertainty in the decision matrix is handled with **F-PROMETHEE** (triangular
-fuzzy numbers, Section 5.4), and the chosen extension is **efficiency
+fuzzy numbers, Section 5.3), and the chosen extension is **efficiency
 measuring** (Section 6).
 
 All tables come from [`results/results.md`](results/results.md) and
@@ -205,27 +205,7 @@ printers swap places can be computed exactly.
   (Δφ = 0.014), so the full ranking changes easily (e.g. speed weight above
   0.110). This is the K2 Plus / H2D swap already seen in Section 4.
 
-### 5.2 Monte-Carlo rank acceptability (20 000 weight vectors)
-
-![rank acceptability](results/figures/06_rank_acceptability.png)
-
-| | ±20 % around M1 | ±50 % around M1 | any weights (uniform) |
-|---|---|---|---|
-| P(U1 is 1st) | **100 %** | **97 %** | 29 % |
-| P(H2D is 1st) | 0 % | 3 % | **62 %** |
-| P(K2 Plus is 1st) | 0 % | 0 % | 8 % |
-| P(CORE One is 1st) | 0 % | 0 % | 1 % |
-| mean rank U1 / K2 / H2D / Prusa | 1.00 / 2.39 / 2.62 / 4.00 | 1.03 / 2.45 / 2.63 / 3.89 | 2.32 / 2.70 / 1.60 / 3.37 |
-
-* **With my weights, U1 is always first.** Even if every weight is uncertain
-  by ±50 %, U1 still wins 97 % of the time.
-* **With no information about priorities (any weights), H2D is the most
-  likely winner (62 %).** Objectively it is the strongest machine. U1 wins
-  *because of my priorities*: low budget and multi-colour printing.
-* **The CORE One almost never wins** (under 1 % even with random weights).
-  It is dominated by the others in most situations.
-
-### 5.3 Sensitivity to preference functions and thresholds
+### 5.2 Sensitivity to preference functions and thresholds
 
 | Variant | Ranking | τ vs base | Winner |
 |---|---|---|---|
@@ -244,7 +224,7 @@ printers swap places can be computed exactly.
   price threshold p from 50 to 900 € gives exactly the same ranking. With any
   nozzle threshold p, U1 stays first.
 
-### 5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers
+### 5.3 F-PROMETHEE – uncertain values as triangular fuzzy numbers
 
 Uncertain values of the decision matrix are replaced by **triangular fuzzy
 numbers (TFN) (l; m; u)**, where m is the value used so far:
@@ -286,7 +266,7 @@ is done on the three numbers (l; m; u):
   the most unfavourable combination (K2 at 45 dB, U1 at 1099 €) could the
   K2 Plus come close to U1.
 
-### 5.5 What if the Bambu H2D goes on sale? (continues Task 1, Section 6)
+### 5.4 What if the Bambu H2D goes on sale? (continues Task 1, Section 6)
 
 ![what-if](results/figures/08_what_if.png)
 
@@ -382,24 +362,6 @@ all printers with price ≤ budget, the one with the highest benefit flow.
   afford, or the best value for money?". My goal in Task 1 was value for
   money, so U1 is my choice.
 
-### 6.3 Robustness of the efficient set
-
-Share of random weight vectors (20 000) for which each printer is efficient:
-
-| Printer | ±20 % | ±50 % | any weights |
-|---|---|---|---|
-| A2 Snapmaker U1 | **100 %** | **100 %** | **100 %** |
-| A3 Bambu Lab H2D | **100 %** | **99.7 %** | 93 % |
-| A1 Creality K2 Plus | 8 % | 30 % | 59 % |
-| A4 Prusa CORE One | 0 % | 0.1 % | 19 % |
-
-* **U1 is always efficient**, because it is the cheapest printer.
-* **H2D is efficient in almost every case**, because it offers the most.
-* **K2 Plus becomes efficient only when** the benefit weights shift toward
-  build volume.
-* **CORE One is practically never efficient**, so it is the weakest choice
-  for my money.
-
 ## 7. Conclusions
 
 1. **Recommendation: Snapmaker U1.**
@@ -408,8 +370,8 @@ Share of random weight vectors (20 000) for which each printer is efficient:
    * It outranks all three other printers in PROMETHEE I.
    * It is efficient (the cheapest printer on the efficient frontier) and
      dominates K2 Plus and CORE One: they are more expensive *and* offer less.
-   * It stays first for ±20 % weight uncertainty (100 %), ±50 % (97 %), and
-     every threshold variant.
+   * It stays first for a wide range of weights (e.g. any price weight
+     above 0.148, any nozzle weight) and for every threshold variant.
    * F-PROMETHEE gives the same ranking with uncertain prices, noise values
      and ease-of-use scores. U1 is the only printer whose whole fuzzy net
      flow is positive.
@@ -419,7 +381,7 @@ Share of random weight vectors (20 000) for which each printer is efficient:
    (0.25), are exactly U1's strengths. Its weaknesses (loudest, small volume,
    slowest) are on criteria with lower weights.
 3. **Bambu H2D is the objectively strongest printer.** It wins with equal
-   weights, when price matters less, and in 62 % of random weight vectors.
+   weights and when price matters less.
    It is the only other efficient printer: the best printer I can buy if I
    am willing to pay 1226 € more.
    It loses only because of its price, and it would become my best choice

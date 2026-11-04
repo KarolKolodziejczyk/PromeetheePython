@@ -167,36 +167,7 @@ Other weights keep their proportions. `best` = A2 Snapmaker U1.
 | C5 | Ease of use [1-5] | 0.080 | 0.000 | 0.090 | 0.000 | 0.399 |
 | C6 | Nozzles [pcs] | 0.250 | 0.000 | 0.273 | 0.000 | 1.000 |
 
-### 5.2 Monte-Carlo rank acceptability (20 000 weight vectors)
-
-**(a) local: every base weight perturbed by ±20 %**
-
-| Alternative | rank 1 | rank 2 | rank 3 | rank 4 | mean rank |
-|---|---|---|---|---|---|
-| A1 Creality K2 Plus Combo | 0.000 | 0.615 | 0.385 | 0.000 | 2.385 |
-| A2 Snapmaker U1 | 1.000 | 0.000 | 0.000 | 0.000 | 1.000 |
-| A3 Bambu Lab H2D | 0.000 | 0.385 | 0.615 | 0.000 | 2.615 |
-| A4 Prusa CORE One | 0.000 | 0.000 | 0.000 | 1.000 | 4.000 |
-
-**(b) local: every base weight perturbed by ±50 %**
-
-| Alternative | rank 1 | rank 2 | rank 3 | rank 4 | mean rank |
-|---|---|---|---|---|---|
-| A1 Creality K2 Plus Combo | 0.001 | 0.548 | 0.451 | 0.000 | 2.450 |
-| A2 Snapmaker U1 | 0.974 | 0.024 | 0.003 | 0.000 | 1.029 |
-| A3 Bambu Lab H2D | 0.025 | 0.428 | 0.440 | 0.107 | 2.628 |
-| A4 Prusa CORE One | 0.000 | 0.000 | 0.107 | 0.893 | 3.893 |
-
-**(c) global: weights uniformly random on the whole simplex**
-
-| Alternative | rank 1 | rank 2 | rank 3 | rank 4 | mean rank |
-|---|---|---|---|---|---|
-| A1 Creality K2 Plus Combo | 0.082 | 0.368 | 0.317 | 0.233 | 2.701 |
-| A2 Snapmaker U1 | 0.289 | 0.294 | 0.222 | 0.195 | 2.323 |
-| A3 Bambu Lab H2D | 0.623 | 0.226 | 0.076 | 0.075 | 1.602 |
-| A4 Prusa CORE One | 0.005 | 0.112 | 0.385 | 0.497 | 3.374 |
-
-### 5.3 Preference-function / threshold sensitivity (ranks)
+### 5.2 Preference-function / threshold sensitivity (ranks)
 
 | Preference-function variant | A1 | A2 | A3 | A4 | Kendall τ vs base | best |
 |---|---|---|---|---|---|---|
@@ -209,7 +180,7 @@ Other weights keep their proportions. `best` = A2 Snapmaker U1.
 | thresholds x2 | 2 | 1 | 4 | 3 | 0.667 | A2 |
 | all 'usual' (type I) | 3 | 1 | 2 | 4 | 0.667 | A2 |
 
-### 5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers
+### 5.3 F-PROMETHEE – uncertain values as triangular fuzzy numbers
 
 Fuzzy decision matrix (l; m; u):
 
@@ -231,7 +202,7 @@ Fuzzy net flows φ~ = (l; m; u) and ranking by the centroid:
 | A3 Bambu Lab H2D | -0.277 | -0.059 | +0.063 | -0.091 | 3 |
 | A4 Prusa CORE One | -0.404 | -0.192 | +0.062 | -0.178 | 4 |
 
-### 5.5 What-if: What if the Bambu Lab H2D goes on sale? (Task 1, section 6)
+### 5.4 What-if: What if the Bambu Lab H2D goes on sale? (Task 1, section 6)
 
 Varying `Price [EUR]` of A3 Bambu Lab H2D (current value 2125), base weights.
 
@@ -276,12 +247,3 @@ Efficiency measuring: which printers give the most for the money? Price is the i
 | 2125 | A3 Bambu Lab H2D | +0.345 |
 
 With the Task 1 budget of 2500 EUR: maximising the benefit flow selects **A3 Bambu Lab H2D**; maximising the full net flow (price as a criterion) selects **A2 Snapmaker U1**.
-
-### Robustness: share of random weight vectors for which a printer is efficient
-
-| Alternative | efficient (±20%) | efficient (±50%) | efficient (any w) |
-|---|---|---|---|
-| A1 Creality K2 Plus Combo | 0.075 | 0.298 | 0.593 |
-| A2 Snapmaker U1 | 1.000 | 1.000 | 1.000 |
-| A3 Bambu Lab H2D | 1.000 | 0.997 | 0.931 |
-| A4 Prusa CORE One | 0.000 | 0.001 | 0.189 |

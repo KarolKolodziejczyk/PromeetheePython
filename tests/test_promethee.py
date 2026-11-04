@@ -3,7 +3,7 @@ import pytest
 
 from promethee import Criterion, Problem, promethee, promethee_I, kendall_tau, preference_matrices
 from promethee.core import PREFERENCE_FUNCTIONS
-from promethee.sensitivity import phi_with_weight, stability_intervals, monte_carlo
+from promethee.sensitivity import phi_with_weight, stability_intervals
 from promethee.core import weighted_sum
 from promethee.efficiency import best_within_budget, efficient_set, split_flows
 from promethee.fuzzy import fuzzy_matrix, fuzzy_promethee
@@ -60,14 +60,6 @@ def test_stability_intervals_are_exact():
             if inside:
                 o = np.argsort(-phi_with_weight(r.phi_j, p.weights, j, t)).tolist()
                 assert o != base_order
-
-
-def test_monte_carlo_rows_sum_to_one():
-    p = Problem.from_json("data/problem.json")
-    r = promethee(p.X, p.criteria, p.weights)
-    acc, mean_rank, _ = monte_carlo(r.phi_j, n_samples=500)
-    np.testing.assert_allclose(acc.sum(axis=1), 1)
-    np.testing.assert_allclose(acc.sum(axis=0), 1)
 
 
 def test_wsm_reproduces_task1_spreadsheet():

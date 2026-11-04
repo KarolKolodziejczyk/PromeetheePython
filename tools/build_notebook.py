@@ -146,12 +146,6 @@ for every price weight above 0.148 (mine is 0.30) and for any nozzle weight. The
 would need about 2.4 times or more of their weight to change the winner. So the winner is stable;
 only the order of places 2 and 3 changes easily.
 """),
-    show("Random weights (Monte Carlo)", "06_rank_acceptability.png"),
-    interp("""
-With weights randomly changed by ±20 % around mine, U1 is first in 100 % of cases, and with ±50 %
-in 97 %. With completely random weights H2D wins most often (62 %). So H2D is probably the
-"objectively" strongest printer, and U1 wins because of my priorities (low price, multi-colour).
-"""),
     show("Changing the thresholds q and p", csv="threshold_sensitivity.csv"),
     interp("""
 The thresholds are my own choice, so I multiplied all of them by 0.25 to 2. U1 is first in every
@@ -204,10 +198,8 @@ produced = [p.name for p in (ROOT / "results").glob("*.csv")] + \
            [p.name for p in (ROOT / "results" / "figures").glob("*.png")]
 # deliberately not shown (kept in results/ and REPORT.md, not needed in the notebook)
 HIDDEN = {"criteria_parameters.csv", "ranking_comparison_ranks.csv", "unicriterion_net_flows.csv", "preference_index_matrix.csv", "ranking_comparison_scores.csv",
-          "rank_acceptability_local20.csv", "rank_acceptability_local50.csv",
-          "rank_acceptability_simplex.csv", "07_threshold_sweeps.png", "what_if.csv",
-          "08_what_if.png", "budget_choice.csv", "10_budget_choice.png",
-          "efficiency_acceptability.csv"}
+          "07_threshold_sweeps.png", "what_if.csv",
+          "08_what_if.png", "budget_choice.csv", "10_budget_choice.png"}
 missing = [f for f in produced if f not in shown and f not in HIDDEN]
 if missing:
     raise SystemExit(f"not displayed in notebook: {missing}")

@@ -74,19 +74,3 @@ def budget_sweep(scores: np.ndarray, costs: np.ndarray, budgets):
         sub, _ = best_within_budget(scores, costs, b)
         out.append(sub[0] if sub else -1)
     return np.array(out)
-
-
-def efficiency_acceptability(phi_j: np.ndarray, w, cost_idx, n_samples: int = 20000,
-                             mode: str = "local", spread: float = 0.2, seed: int = 11):
-    """Share of random weight vectors for which each alternative is efficient."""
-    rng = np.random.default_rng(seed)
-    m = phi_j.shape[1]
-    if mode == "local":
-        W = normalise(w) * rng.uniform(1 - spread, 1 + spread, size=(n_samples, m))
-    else:
-        W = rng.dirichlet(np.ones(m), size=n_samples)
-    counts = np.zeros(phi_j.shape[0])
-    for wk in W:
-        b, c = split_flows(phi_j, wk, cost_idx)
-        counts += efficient_set(b, c)
-    return counts / n_samples

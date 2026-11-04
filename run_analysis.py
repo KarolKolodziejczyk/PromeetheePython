@@ -21,9 +21,9 @@ from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 from promethee import (Problem, kendall_tau, promethee, promethee_I,  # noqa: E402
                        ranks_from_scores, spearman_rho, weighted_sum)
 from promethee.efficiency import (best_within_budget, budget_sweep,  # noqa: E402
-                                  efficiency_acceptability, efficient_set, split_flows)
+                                  efficient_set, split_flows)
 from promethee.fuzzy import fuzzy_matrix, fuzzy_promethee  # noqa: E402
-from promethee.sensitivity import (monte_carlo, single_threshold_sweep,  # noqa: E402
+from promethee.sensitivity import (single_threshold_sweep,  # noqa: E402
                                    stability_intervals, threshold_sensitivity,
                                    weight_sweep)
 
@@ -358,49 +358,6 @@ def main(path: str):
     fig.tight_layout()
     save(fig, "05_weight_sweeps.png")
 
-    # Monte Carlo
-    acc_s, mr_s, _ = monte_carlo(res.phi_j, mode="simplex")
-    acc_l, mr_l, _ = monte_carlo(res.phi_j, pb.weights, mode="local", spread=0.2)
-    acc_l30, mr_l30, _ = monte_carlo(res.phi_j, pb.weights, mode="local", spread=0.5)
-    rcols = [f"rank {r + 1}" for r in range(n)]
-    acc_sdf = pd.DataFrame(acc_s, index=pb.labels, columns=rcols)
-    acc_sdf["mean rank"] = mr_s
-    acc_ldf = pd.DataFrame(acc_l, index=pb.labels, columns=rcols)
-    acc_ldf["mean rank"] = mr_l
-    acc_l5 = pd.DataFrame(acc_l30, index=pb.labels, columns=rcols)
-    acc_l5["mean rank"] = mr_l30
-    for d in (acc_sdf, acc_ldf, acc_l5):
-        d.index.name = "Alternative"
-    acc_sdf.to_csv(OUT / "rank_acceptability_simplex.csv")
-    acc_ldf.to_csv(OUT / "rank_acceptability_local20.csv")
-    acc_l5.to_csv(OUT / "rank_acceptability_local50.csv")
-    md += ["### 5.2 Monte-Carlo rank acceptability (20 000 weight vectors)\n",
-           "**(a) local: every base weight perturbed by ±20 %**\n",
-           md_table(acc_ldf, "{:.3f}"), "",
-           "**(b) local: every base weight perturbed by ±50 %**\n",
-           md_table(acc_l5, "{:.3f}"), "",
-           "**(c) global: weights uniformly random on the whole simplex**\n",
-           md_table(acc_sdf, "{:.3f}"), ""]
-
-    fig, axes = plt.subplots(1, 3, figsize=(13, 3.4), sharey=True)
-    for ax, acc, ttl in zip(axes, (acc_l, acc_l30, acc_s),
-                            ("±20 % around base weights", "±50 % around base weights",
-                             "any weights (uniform simplex)")):
-        ax.grid(False)
-        ax.imshow(acc, cmap=SEQUENTIAL, vmin=0, vmax=1, aspect="auto")
-        for i in range(n):
-            for r in range(n):
-                if acc[i, r] >= 0.005:
-                    ax.text(r, i, f"{acc[i, r]:.0%}", ha="center", va="center",
-                            fontsize=8, color="white" if acc[i, r] > 0.5 else INK)
-        ax.set_xticks(range(n), [str(r + 1) for r in range(n)])
-        ax.set_xlabel("rank position")
-        ax.set_title(ttl, loc="left", fontsize=10)
-    axes[0].set_yticks(range(n), pb.labels)
-    fig.suptitle("Rank acceptability: share of random weight vectors giving each rank",
-                 x=0.01, ha="left", fontweight="bold")
-    fig.tight_layout()
-    save(fig, "06_rank_acceptability.png")
 
     # ------------------------------------------- sensitivity: thresholds
     th = threshold_sensitivity(pb.X, pb.criteria, pb.weights)
@@ -409,7 +366,7 @@ def main(path: str):
                           for _, phi, r, tau in th], index=[t[0] for t in th])
     th_df.index.name = "Preference-function variant"
     th_df.to_csv(OUT / "threshold_sensitivity.csv")
-    md += ["### 5.3 Preference-function / threshold sensitivity (ranks)\n",
+    md += ["### 5.2 Preference-function / threshold sensitivity (ranks)\n",
            md_table(th_df, "{:.3f}"), ""]
 
     # single-threshold sweeps for criteria having p
@@ -464,7 +421,7 @@ def main(path: str):
         fp.index.name = "Alternative"
         fp = fp.sort_values("F-PROMETHEE rank")
         fp.to_csv(OUT / "fuzzy_promethee.csv")
-        md += ["### 5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers\n",
+        md += ["### 5.3 F-PROMETHEE – uncertain values as triangular fuzzy numbers\n",
                "Fuzzy decision matrix (l; m; u):\n", md_table(tfn), "",
                f"Weights are TFNs too: ({1 - ws:g}·w; w; {1 + ws:g}·w).\n",
                "Fuzzy net flows φ~ = (l; m; u) and ranking by the centroid:\n",
@@ -518,7 +475,7 @@ def main(path: str):
                         f"rank of {A[ai]}": int(rr.ranks()[ai])})
         wi_df = pd.DataFrame(tab).set_index("value")
         wi_df.to_csv(OUT / "what_if.csv")
-        md += [f"### 5.5 What-if: {wi.get('description', '')}\n",
+        md += [f"### 5.4 What-if: {wi.get('description', '')}\n",
                f"Varying `{cnames[cj]}` of {pb.labels[ai]} (current value {cur:g}), "
                "base weights.\n", md_table(wi_df, "{:+.3f}"), "",
                "Winner changes at: " + (", ".join(f"{x:.0f}" for x in switch)
@@ -587,15 +544,6 @@ def main(path: str):
         pv_df.to_csv(OUT / "budget_choice.csv")
         pv_task1, _ = best_within_budget(ben, price, 2500)
         pv_full, _ = best_within_budget(res.phi, price, 2500)
-        # robustness: how often is each printer efficient under random weights
-        acc = {f"efficient (±{int(s * 100)}%)": efficiency_acceptability(res.phi_j, pb.weights,
-                                                                        cidx, spread=s)
-               for s in (0.2, 0.5)}
-        acc["efficient (any w)"] = efficiency_acceptability(res.phi_j, pb.weights, cidx,
-                                                            mode="simplex")
-        acc_df = pd.DataFrame(acc, index=pb.labels)
-        acc_df.index.name = "Alternative"
-        acc_df.to_csv(OUT / "efficiency_acceptability.csv")
         md += ["## 6. Extension – efficiency measuring\n",
                eff_cfg.get("description", ""), "",
                "### Cost and benefit flows, efficient set\n", md_table(eff_df, "{:+.3f}"), "",
@@ -605,9 +553,7 @@ def main(path: str):
                md_table(pv_df, "{:+.3f}"), "",
                f"With the Task 1 budget of 2500 EUR: maximising the benefit flow selects "
                f"**{pb.labels[pv_task1[0]]}**; maximising the full net flow (price as a "
-               f"criterion) selects **{pb.labels[pv_full[0]]}**.\n",
-               "### Robustness: share of random weight vectors for which a printer is "
-               "efficient\n", md_table(acc_df, "{:.3f}"), ""]
+               f"criterion) selects **{pb.labels[pv_full[0]]}**.\n"]
 
         # fig: efficient frontier
         fig, ax = plt.subplots(figsize=(7.8, 4.4))
