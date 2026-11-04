@@ -3,11 +3,15 @@
 The notebook embeds the current source files (via %%writefile), so it runs
 without cloning the repository. Re-run after changing the code:
 
-    python tools/build_notebook.py
+    python tools/build_notebook.py               # builds and executes (outputs saved)
+    python tools/build_notebook.py --no-execute  # structure only
+
+Executing needs: pip install nbclient ipykernel
 """
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,9 +85,12 @@ cells += [
     show("Performance table", csv="performance_table.csv"),
     show("Criteria parameters and base weights", csv="criteria_parameters.csv"),
     show("PROMETHEE II – flows and ranking", "01_net_flows.png", "promethee_flows.csv"),
+    show("Aggregated preference indices π(a, b)", csv="preference_index_matrix.csv",
+         note="π(a, b) = weighted degree to which row printer is preferred to column printer"),
     show("PROMETHEE I – partial ranking", "02_promethee_I.png", "promethee_I_relations.csv",
          "P = row outranks column, `-` = column outranks row, R = incomparable"),
-    show("Unicriterion net flows (strengths / weaknesses)", "03_unicriterion_profiles.png"),
+    show("Unicriterion net flows (strengths / weaknesses)", "03_unicriterion_profiles.png",
+         "unicriterion_net_flows.csv"),
     md("## 4. Comparison of rankings (weight scenarios, PROMETHEE vs WSM P × W)"),
     show("Ranks under every method and weight scenario", "04_ranking_comparison.png",
          "ranking_comparison_ranks.csv"),
@@ -110,6 +117,15 @@ cells += [
          "except ImportError:\n    print('saved promethee_results.zip')"),
 ]
 
+# every table and figure produced by run_analysis.py must be shown somewhere
+shown = "".join("".join(c["source"]) for c in cells)
+produced = [p.name for p in (ROOT / "results").glob("*.csv")] + \
+           [p.name for p in (ROOT / "results" / "figures").glob("*.png")]
+missing = [f for f in produced if f not in shown and
+           not f.startswith("rank_acceptability_")]  # shown by a loop
+if missing:
+    raise SystemExit(f"not displayed in notebook: {missing}")
+
 nb = {"nbformat": 4, "nbformat_minor": 5,
       "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3"},
                    "language_info": {"name": "python"}, "colab": {"provenance": []}},
@@ -117,4 +133,20 @@ nb = {"nbformat": 4, "nbformat_minor": 5,
 for i, c in enumerate(nb["cells"]):
     c["id"] = f"cell-{i:02d}"
 (ROOT / NB).write_text(json.dumps(nb, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+if "--no-execute" not in sys.argv:
+    # run it so the saved notebook already contains every figure and table
+    import tempfile
+
+    import nbformat
+    from nbclient import NotebookClient
+
+    nbo = nbformat.reads(json.dumps(nb), as_version=4)
+    with tempfile.TemporaryDirectory() as tmp:
+        NotebookClient(nbo, timeout=600, kernel_name="python3",
+                       resources={"metadata": {"path": tmp}}).execute()
+    for c in nbo.cells:
+        for o in c.get("outputs", []):
+            if o.get("output_type") == "error":
+                raise SystemExit(f"notebook error: {o['ename']}: {o['evalue']}")
+    nbformat.write(nbo, ROOT / NB)
 print(f"wrote {NB} with {len(cells)} cells")

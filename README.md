@@ -11,7 +11,7 @@ extended sensitivity analysis and the **FlowSort** (PROMETHEE SORT) extension.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/KarolKolodziejczyk/PromeetheePython/blob/claude/wizardly-edison-vn4pzz/PROMETHEE_Colab.ipynb)
 
-Open [`PROMETHEE_Colab.ipynb`](PROMETHEE_Colab.ipynb) in Colab and choose **Runtime → Run all**.
+Open [`PROMETHEE_Colab.ipynb`](PROMETHEE_Colab.ipynb) in Colab – it is saved with all outputs, so every figure and table is visible immediately. Choose **Runtime → Run all** to recompute.
 The notebook is self-contained (it writes the code and data files itself), so it also works
 if the repository is private: download the `.ipynb` and upload it in Colab via
 *File → Upload notebook*. Edit the `data/problem.json` cell to change the data or weights.
