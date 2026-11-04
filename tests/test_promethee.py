@@ -4,7 +4,8 @@ import pytest
 from promethee import Criterion, Problem, promethee, promethee_I, kendall_tau
 from promethee.core import PREFERENCE_FUNCTIONS
 from promethee.sensitivity import phi_with_weight, stability_intervals, monte_carlo
-from promethee.group import group_flows
+from promethee.core import weighted_sum
+from promethee.sort import flowsort
 
 
 def test_preference_functions_shapes():
@@ -68,14 +69,22 @@ def test_monte_carlo_rows_sum_to_one():
     np.testing.assert_allclose(acc.sum(axis=0), 1)
 
 
-def test_group_equals_promethee_with_mixed_weights():
+def test_wsm_reproduces_task1_spreadsheet():
+    # Task 1 (KK_MCDM_1.xlsx): U1 0.850, H2D 0.673, K2 0.662, Prusa 0.588 (method 1)
     p = Problem.from_json("data/problem.json")
-    r = promethee(p.X, p.criteria, p.weights)
-    dms = {k: np.array(v["weights"]) for k, v in p.group["decision_makers"].items()}
-    imp = {k: v["importance"] for k, v in p.group["decision_makers"].items()}
-    names, lam, indiv, group = group_flows(r.phi_j, dms, imp)
-    w_mix = sum(l * dms[k] / dms[k].sum() for l, k in zip(lam, names))
-    np.testing.assert_allclose(group, promethee(p.X, p.criteria, w_mix).phi)
+    s = weighted_sum(p.X, p.criteria, p.weights, "ratio")
+    np.testing.assert_allclose(s, [0.66171, 0.85000, 0.67316, 0.58844], atol=1e-4)
+
+
+def test_flowsort_extremes():
+    p = Problem.from_json("data/problem.json")
+    R = np.array(list(p.config["sort"]["profiles"].values()), float)
+    # an alternative equal to the ideal profile -> best class,
+    # one far worse than the limits -> below the lowest class
+    X = np.vstack([R[0], R[-1] * np.array([2, 1.5, 0.5, 0.5, 0.5, 0.5])])
+    o = flowsort(X, p.criteria, p.weights, R)
+    assert o["net"][0] == 0
+    assert o["net"][1] == len(R) - 1
 
 
 def test_kendall_tau():

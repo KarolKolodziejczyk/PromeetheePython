@@ -1,5 +1,5 @@
 """Run the complete Task 2 analysis: PROMETHEE I/II, ranking comparison,
-sensitivity analysis and group decision-making extension.
+sensitivity analysis, what-if analysis and FlowSort (PROMETHEE sorting) extension.
 
 Usage:  python run_analysis.py [path/to/problem.json]
 
@@ -20,8 +20,7 @@ from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 
 from promethee import (Problem, kendall_tau, promethee, promethee_I,  # noqa: E402
                        ranks_from_scores, spearman_rho, weighted_sum)
-from promethee.group import (consensus, group_flows,  # noqa: E402
-                             importance_monte_carlo, importance_simplex_winners)
+from promethee.sort import class_acceptability, flowsort  # noqa: E402
 from promethee.sensitivity import (monte_carlo, single_threshold_sweep,  # noqa: E402
                                    stability_intervals, threshold_sensitivity,
                                    weight_sweep)
@@ -200,13 +199,14 @@ def main(path: str):
     # ----------------------------------------- ranking comparison / scenarios
     md.append("## 4. Comparison of rankings\n")
     scen = dict(pb.weight_scenarios) or {"Base": pb.weights}
+    wsm_norm = pb.config.get("weighted_sum_normalisation", "ratio")
     rows_phi, rows_rank = {}, {}
     for name, w in scen.items():
         rr = promethee(pb.X, pb.criteria, w)
         rows_phi[f"PROMETHEE II – {name}"] = rr.phi
         rows_rank[f"PROMETHEE II – {name}"] = rr.ranks()
     for name, w in scen.items():
-        ws = weighted_sum(pb.X, pb.criteria, w)
+        ws = weighted_sum(pb.X, pb.criteria, w, wsm_norm)
         rows_phi[f"Weighted sum (P×W) – {name}"] = ws
         rows_rank[f"Weighted sum (P×W) – {name}"] = ranks_from_scores(ws)
     rank_df = pd.DataFrame(rows_rank, index=A).T
@@ -226,7 +226,8 @@ def main(path: str):
     corr.index.name = "Method / weights"
     md += ["### Weight scenarios\n", md_table(wtab, "{:.3f}"), "",
            "### Ranks (1 = best)\n", md_table(rank_df, "{:d}"), "",
-           "### Scores (net flow φ for PROMETHEE, normalised score for P×W)\n",
+           f"### Scores (net flow φ for PROMETHEE, WSM score with `{wsm_norm}` "
+           "normalisation for P×W)\n",
            md_table(score_df, "{:+.3f}"), "",
            f"### Rank correlation with `{base_key}`\n", md_table(corr, "{:.3f}"), ""]
     # PROMETHEE vs P×W within each scenario
@@ -288,9 +289,12 @@ def main(path: str):
         axes[k].axis("off")
     axes[0].set_ylabel("net flow φ")
     handles, lbls = axes[0].get_legend_handles_labels()
-    fig.legend(handles, lbls, loc="lower right" if m % cols else "upper center",
-               bbox_to_anchor=(0.97, 0.12) if m % cols else (0.5, 1.02),
-               ncol=1 if m % cols else n, fontsize=8.5)
+    if m % cols:
+        fig.legend(handles, lbls, loc="lower right", bbox_to_anchor=(0.97, 0.12),
+                   ncol=1, fontsize=8.5)
+    else:
+        fig.legend(handles, lbls, loc="upper center", bbox_to_anchor=(0.5, 0.0),
+                   ncol=n, fontsize=8.5)
     fig.suptitle("Net flow vs weight of one criterion (dashed = base weight, "
                  "shaded = ranking unchanged)", x=0.01, ha="left", fontweight="bold")
     fig.tight_layout()
@@ -354,9 +358,13 @@ def main(path: str):
     sweep_c = [j for j, c in enumerate(pb.criteria) if c.function in
                ("linear", "v-shape", "level")]
     if sweep_c:
-        fig, axes = plt.subplots(1, len(sweep_c), figsize=(3.7 * len(sweep_c), 3.1),
-                                 sharey=True)
-        axes = np.atleast_1d(axes)
+        ncol = min(3, len(sweep_c))
+        nrow = int(np.ceil(len(sweep_c) / ncol))
+        fig, axes = plt.subplots(nrow, ncol, figsize=(3.9 * ncol + 1.6, 3.0 * nrow),
+                                 sharey=True, squeeze=False)
+        axes = axes.ravel()
+        for k in range(len(sweep_c), len(axes)):
+            axes[k].axis("off")
         for ax, j in zip(axes, sweep_c):
             c = pb.criteria[j]
             vals = np.linspace(max(c.q, 1e-6) if c.function != "v-shape" else 1e-6,
@@ -367,99 +375,171 @@ def main(path: str):
             ax.axvline(c.p, color=INK2, lw=1, ls="--")
             ax.set_title(f"{c.id}: preference threshold p", loc="left", fontsize=9.5)
             ax.set_xlabel(f"p ({c.name})")
-        axes[0].set_ylabel("net flow φ")
-        axes[-1].legend(fontsize=7.5, loc="center left", bbox_to_anchor=(1.02, 0.5))
+        for k in range(0, len(axes), ncol):
+            axes[k].set_ylabel("net flow φ")
+        axes[ncol - 1].legend(fontsize=7.5, loc="upper left", bbox_to_anchor=(1.02, 1.0))
         fig.suptitle("Net flows vs preference threshold p (dashed = value used)",
                      x=0.01, ha="left", fontweight="bold")
         fig.tight_layout()
         save(fig, "07_threshold_sweeps.png")
 
-    # ------------------------------------------------ group decision making
-    if pb.group.get("decision_makers"):
-        dms = pb.group["decision_makers"]
-        dmw = {k: np.array(v["weights"], float) for k, v in dms.items()}
-        imp = {k: float(v["importance"]) for k, v in dms.items()}
-        names, lam, indiv, gphi = group_flows(res.phi_j, dmw, imp)
-        vs_g, pair = consensus(indiv, gphi)
-        g = pd.DataFrame(indiv.T, index=pb.labels, columns=names)
-        g["Group φ"] = gphi
-        g["Group rank"] = ranks_from_scores(gphi)
-        for k, nm in enumerate(names):
-            g[f"rank {nm.split()[0]}"] = ranks_from_scores(indiv[k])
-        g.index.name = "Alternative"
-        g = g.sort_values("Group rank")
-        g.to_csv(OUT / "group_decision.csv")
-        dm_tab = pd.DataFrame({nm: dmw[nm] / dmw[nm].sum() for nm in names}, index=C).T
-        dm_tab["importance λ"] = lam
-        dm_tab["Kendall τ vs group"] = vs_g
-        dm_tab.index.name = "Decision maker"
-        pair_df = pd.DataFrame(pair, index=[x.split()[0] for x in names],
-                               columns=[x.split()[0] for x in names])
-        pair_df.index.name = "τ"
-        wins = importance_monte_carlo(indiv)
-        win_df = pd.DataFrame({"P(best) for random DM importances": wins}, index=pb.labels)
-        win_df.index.name = "Alternative"
-        md += ["## 6. Extension – group decision-making (PROMETHEE GDSS)\n",
-               pb.group.get("description", ""), "",
-               md_table(dm_tab, "{:.3f}"), "",
-               md_table(g, "{:+.3f}"), "",
-               "### Pairwise agreement of DMs (Kendall τ)\n", md_table(pair_df, "{:.3f}"),
-               "", "### Robustness to DM importance\n", md_table(win_df, "{:.3f}"), ""]
-
-        # fig: individual vs group flows
-        fig, ax = plt.subplots(figsize=(8.6, 3.6))
-        K = len(names)
-        x = np.arange(n)
-        order_g = np.argsort(-gphi)
-        bw = 0.8 / (K + 1)
-        dm_cols = ["#86b6ef", "#3987e5", "#1c5cab"]  # sequential blue steps per DM
-        for k in range(K):
-            ax.bar(x + (k - K / 2) * bw, indiv[k][order_g], width=bw * 0.92,
-                   color=dm_cols[k % 3] if K <= 3 else SERIES[k], label=names[k])
-        ax.bar(x + (K - K / 2) * bw, gphi[order_g], width=bw * 0.92, color=SERIES[1],
-               label="Group (weighted)")
-        ax.set_xticks(x, [pb.labels[i] for i in order_g], rotation=20, ha="right")
-        ax.axhline(0, color=AXIS, lw=1)
+    # --------------------------------------------- what-if: one performance
+    wi = pb.config.get("what_if")
+    if wi:
+        ai, cj = A.index(wi["alternative"]), C.index(wi["criterion"])
+        vals = np.linspace(wi["values_from"], wi["values_to"], 361)
+        fl = []
+        for v in vals:
+            Xv = pb.X.copy()
+            Xv[ai, cj] = v
+            fl.append(promethee(Xv, pb.criteria, pb.weights).phi)
+        fl = np.array(fl)
+        win = fl.argmax(axis=1)
+        # value where the alternative starts / stops being the winner
+        is_best = win == ai
+        switch = []
+        for k in range(1, len(vals)):
+            if is_best[k] != is_best[k - 1]:
+                # interpolate where the alternative ties with the other leader
+                other = win[k] if win[k] != ai else win[k - 1]
+                d0 = fl[k - 1, ai] - fl[k - 1, other]
+                d1 = fl[k, ai] - fl[k, other]
+                switch.append(vals[k - 1] + (vals[k] - vals[k - 1]) * d0 / (d0 - d1))
+        cur = pb.X[ai, cj]
+        tab = []
+        for v in sorted(set([cur, *[round(x) for x in np.linspace(wi["values_from"],
+                                                                  wi["values_to"], 7)]])):
+            Xv = pb.X.copy()
+            Xv[ai, cj] = v
+            rr = promethee(Xv, pb.criteria, pb.weights)
+            tab.append({"value": v, **{A[i]: rr.phi[i] for i in range(n)},
+                        "winner": pb.labels[int(np.argmax(rr.phi))],
+                        f"rank of {A[ai]}": int(rr.ranks()[ai])})
+        wi_df = pd.DataFrame(tab).set_index("value")
+        wi_df.to_csv(OUT / "what_if.csv")
+        md += [f"### 5.4 What-if: {wi.get('description', '')}\n",
+               f"Varying `{cnames[cj]}` of {pb.labels[ai]} (current value {cur:g}), "
+               "base weights.\n", md_table(wi_df, "{:+.3f}"), "",
+               "Winner changes at: " + (", ".join(f"{x:.0f}" for x in switch)
+                                        if switch else "never in this range") + "\n"]
+        fig, ax = plt.subplots(figsize=(7.6, 3.6))
+        for i, a in enumerate(A):
+            ax.plot(vals, fl[:, i], color=color[a], label=pb.labels[i],
+                    lw=2.6 if i == ai else 2)
+        ax.axvline(cur, color=INK2, lw=1, ls="--")
+        ax.text(cur, ax.get_ylim()[1], f" current {cur:g}", color=INK2, fontsize=8,
+                va="top")
+        for x in switch:
+            ax.axvline(x, color=INK, lw=1, ls=":")
+            ax.text(x, ax.get_ylim()[0], f" {x:.0f}", color=INK, fontsize=8,
+                    va="bottom")
+        ax.set_xlabel(f"{cnames[cj]} of {pb.labels[ai]}")
         ax.set_ylabel("net flow φ")
-        ax.grid(axis="x", visible=False)
-        ax.legend(fontsize=8, ncol=2, loc="upper right")
-        ax.set_title("Individual decision makers vs group net flows", loc="left")
-        save(fig, "08_group_flows.png")
+        ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1))
+        ax.set_title(wi.get("description", "What-if"), loc="left")
+        save(fig, "08_what_if.png")
 
-        if K == 3:
-            pts = importance_simplex_winners(indiv, resolution=120)
-            l1, l2, l3, win = pts.T
-            xx = l2 + 0.5 * l3
-            yy = np.sqrt(3) / 2 * l3
-            fig, ax = plt.subplots(figsize=(8.4, 5.6))
+    # ------------------------------------------------ extension: FlowSort
+    srt = pb.config.get("sort")
+    if srt:
+        classes = srt["classes"]
+        K = len(classes)
+        R = np.array(list(srt["profiles"].values()), float)
+        pnames = list(srt["profiles"])
+        cls_names = classes + ["Below limits"]
+        prof_df = pd.DataFrame(R, index=pnames, columns=cnames)
+        prof_df.index.name = "Limiting profile"
+        rows = {}
+        detail = None
+        for name, w in scen.items():
+            o = flowsort(pb.X, pb.criteria, w, R)
+            rows[name] = [cls_names[k] for k in o["net"]]
+            if detail is None:
+                detail = o
+        sort_scen = pd.DataFrame(rows, index=pb.labels).T
+        sort_scen.index.name = "Weights"
+        sort_scen.to_csv(OUT / "flowsort_scenarios.csv")
+
+        def _interval(lo, hi):
+            lo, hi = min(lo, hi), max(lo, hi)
+            return cls_names[lo] if lo == hi else f"{cls_names[lo]} – {cls_names[hi]}"
+
+        base_sort = pd.DataFrame({
+            "φ (in R ∪ {a})": detail["phi"],
+            "class by φ": [cls_names[k] for k in detail["net"]],
+            "class by φ+": [cls_names[k] for k in detail["plus"]],
+            "class by φ−": [cls_names[k] for k in detail["minus"]],
+            "interval (φ+, φ−)": [_interval(a, b) for a, b in
+                                  zip(detail["plus"], detail["minus"])],
+        }, index=pb.labels)
+        base_sort.index.name = "Alternative"
+        base_sort.to_csv(OUT / "flowsort_base.csv")
+        acc20 = class_acceptability(pb.X, pb.criteria, pb.weights, R, spread=0.2)
+        acc50 = class_acceptability(pb.X, pb.criteria, pb.weights, R, spread=0.5)
+        accg = class_acceptability(pb.X, pb.criteria, pb.weights, R, mode="simplex")
+        acc_df = pd.DataFrame(np.hstack([acc20, acc50, accg]), index=pb.labels,
+                              columns=[f"{c} (±20%)" for c in cls_names]
+                              + [f"{c} (±50%)" for c in cls_names]
+                              + [f"{c} (any w)" for c in cls_names])
+        acc_df = acc_df.loc[:, acc_df.sum(axis=0) > 0]
+        acc_df.index.name = "Alternative"
+        acc_df.to_csv(OUT / "flowsort_acceptability.csv")
+        prof_phi = pd.DataFrame(detail["profile_phi"], index=pb.labels, columns=pnames)
+        prof_phi.index.name = "flows of profiles when sorting"
+        md += ["## 6. Extension – FlowSort (PROMETHEE sorting)\n",
+               srt.get("description", ""), "", "### Limiting profiles\n",
+               md_table(prof_df, "{:g}"), "",
+               f"### Assignment with base weights\n", md_table(base_sort, "{:+.3f}"), "",
+               "Net flows of the profiles in each sorting run:\n",
+               md_table(prof_phi, "{:+.3f}"), "",
+               "### Assignment under every weight scenario\n", md_table(sort_scen), "",
+               "### Class acceptability (5 000 random weight vectors each)\n",
+               md_table(acc_df, "{:.3f}"), ""]
+
+        # fig: profiles vs alternative flows (base weights)
+        fig, ax = plt.subplots(figsize=(7.8, 3.4))
+        ax.grid(axis="y", visible=False)
+        band = ["#cde2fb", "#e8f1fd", "#f7f6f3"]
+        ylab = []
+        for i in range(n):
+            pr = detail["profile_phi"][i]
+            for k in range(K):
+                ax.barh(i, pr[k] - pr[k + 1], left=pr[k + 1], height=0.62,
+                        color=band[k % 3], edgecolor="white", lw=2)
+                if i == n - 1:
+                    ax.text((pr[k] + pr[k + 1]) / 2, n - 1 + 0.42, classes[k],
+                            ha="center", va="top", fontsize=8.5, color=INK2)
+            ax.scatter(detail["phi"][i], i, s=90, color=color[A[i]], zorder=5,
+                       edgecolor="white", lw=1.5)
+            ax.text(detail["phi"][i], i + 0.36, f"{detail['phi'][i]:+.3f}", ha="center",
+                    fontsize=8, color=INK)
+            ylab.append(pb.labels[i])
+        ax.set_yticks(range(n), ylab)
+        ax.set_xlabel("net flow φ in the set {profiles} ∪ {printer}")
+        ax.set_ylim(n - 1 + 0.7, -0.5)
+        ax.set_title("FlowSort: each printer (dot) against the class bands "
+                     "(base weights)", loc="left")
+        save(fig, "09_flowsort.png")
+
+        # fig: class acceptability
+        fig, axes = plt.subplots(1, 3, figsize=(12, 2.9), sharey=True)
+        for ax, acc, ttl in zip(axes, (acc20, acc50, accg),
+                                ("±20 % around base weights", "±50 % around base weights",
+                                 "any weights (uniform simplex)")):
             ax.grid(False)
-            present = sorted(set(win.astype(int)))
-            for wi in present:
-                mk = win == wi
-                ax.scatter(xx[mk], yy[mk], s=16, color=color[A[wi]], marker="s",
-                           lw=0, label=f"{pb.labels[wi]} best")
-            # actual importance
-            ax.scatter([lam[1] + 0.5 * lam[2]], [np.sqrt(3) / 2 * lam[2]], s=120,
-                       facecolor="white", edgecolor=INK, lw=2, zorder=5,
-                       label="chosen importances")
-            ax.plot([0, 1, 0.5, 0], [0, 0, np.sqrt(3) / 2, 0], color=INK2, lw=1)
-            ax.text(-0.02, -0.04, names[0], ha="left", va="top", fontsize=8.5)
-            ax.text(1.02, -0.04, names[1], ha="right", va="top", fontsize=8.5)
-            ax.text(0.5, np.sqrt(3) / 2 + 0.03, names[2], ha="center", fontsize=8.5)
-            ax.set_xlim(-0.08, 1.08)
-            ax.set_ylim(-0.12, 0.95)
-            ax.set_aspect("equal")
-            ax.axis("off")
-            from matplotlib.lines import Line2D
-            hd = [Line2D([], [], ls="", marker="s", ms=8, color=color[A[wi]],
-                         label=f"{pb.labels[wi]} best") for wi in present]
-            hd.append(Line2D([], [], ls="", marker="o", ms=9, mfc="white", mec=INK,
-                             mew=2, label="chosen importances"))
-            ax.legend(handles=hd, loc="upper left", bbox_to_anchor=(1.0, 0.95),
-                      fontsize=8)
-            ax.set_title("Group winner for every importance split of the 3 DMs\n"
-                         "(corner = that DM decides alone)", loc="left")
-            save(fig, "09_group_importance_simplex.png")
+            ax.imshow(acc, cmap=SEQUENTIAL, vmin=0, vmax=1, aspect="auto")
+            for i in range(n):
+                for k in range(K + 1):
+                    if acc[i, k] >= 0.005:
+                        ax.text(k, i, f"{acc[i, k]:.0%}", ha="center", va="center",
+                                fontsize=8.5, color="white" if acc[i, k] > 0.5 else INK)
+            ax.set_xticks(range(K + 1), cls_names, fontsize=8)
+            ax.set_title(ttl, loc="left", fontsize=10)
+        axes[0].set_yticks(range(n), pb.labels)
+        fig.suptitle("FlowSort class acceptability: share of random weights giving "
+                     "each class", x=0.01, ha="left", fontweight="bold")
+        fig.tight_layout()
+        save(fig, "10_flowsort_acceptability.png")
 
     (OUT / "results.md").write_text("\n".join(md), encoding="utf-8")
     print("\n".join(md))

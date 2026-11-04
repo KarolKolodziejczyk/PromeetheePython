@@ -1,6 +1,7 @@
 id,criterion,direction,function,q,p,s,weight
-C1,Price [kPLN],min,linear,5.0,40.0,0.0,0.3
-C2,Range WLTP [km],max,linear,20.0,120.0,0.0,0.25
-C3,Charging 10-80% [min],min,v-shape,0.0,20.0,0.0,0.15
-C4,Boot capacity [l],max,level,50.0,150.0,0.0,0.15
-C5,Safety & equipment [1-10],max,usual,0.0,0.0,0.0,0.15
+C1,Price [EUR],min,linear,50.0,600.0,0.0,0.30000000000000004
+C2,Noise [dB(A)],min,linear,2.0,7.0,0.0,0.15000000000000002
+C3,Max speed [mm/s],max,linear,50.0,400.0,0.0,0.10000000000000002
+C4,Build volume [dm3],max,linear,2.0,20.0,0.0,0.12000000000000001
+C5,Ease of use [1-5],max,level,0.5,1.5,0.0,0.08000000000000002
+C6,Nozzles [pcs],max,v-shape,0.0,3.0,0.0,0.25000000000000006

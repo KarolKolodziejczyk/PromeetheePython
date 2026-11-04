@@ -1,314 +1,367 @@
-# Task 2 – PROMETHEE analysis of the Task 1 MCDM problem
+# Task 2 – PROMETHEE for my Task 1 problem: which 3D printer should I buy?
 
-> **Data note.** The repository did not contain the Task 1 data, so this
-> analysis uses an example problem (choosing an electric car for a family,
-> 6 alternatives × 5 criteria). All the data is in
-> [`data/problem.json`](data/problem.json). To use the Task 1 problem instead,
-> replace that file and run `python run_analysis.py`. Every table and figure
-> is regenerated, but the written interpretation in this report must then be
-> updated by hand.
+**Problem (from Task 1, `KK_MCDM_1.xlsx`).** I want to buy an FDM printer for
+home. The budget is at most 2500 EUR, and the printer will stand in my room, so
+noise matters. I compare 4 printers on 6 criteria. The performance data and
+both weighting methods are copied unchanged from the Task 1 spreadsheet.
 
 **Tool choice.** I used my own Python code (`promethee/`, numpy only) and did
-**not** use Visual PROMETHEE. In line with the task rules, no output of this
-code was fed into VP, and no VP-specific output was recreated. That is why the
-report has no GAIA plane. Because VP is not used, the sensitivity analysis is
-extended (Section 5), and the chosen extension is **group decision-making**
-(Section 6).
+not use Visual PROMETHEE. In line with the task rules, nothing from this code
+was put into VP, and no VP-specific output (e.g. the GAIA plane) was recreated.
+Because VP is not used, the sensitivity analysis is extended (Section 5), and
+the chosen extension is **SORT (FlowSort)** (Section 6).
 
-All numbers below come from [`results/results.md`](results/results.md) and the
-CSV files in `results/`.
+All tables come from [`results/results.md`](results/results.md) and
+`results/*.csv`. To regenerate everything, run `python run_analysis.py`.
 
 ---
 
-## 1. Problem definition
+## 1. Data and PROMETHEE parameters
 
-| | Price [kPLN] | Range WLTP [km] | Charging 10–80 % [min] | Boot [l] | Safety & equipment [1–10] |
-|---|---|---|---|---|---|
-| **A1** City Compact | 140 | 320 | 35 | 300 | 6 |
-| **A2** Family Hatch | 185 | 420 | 30 | 385 | 8 |
-| **A3** Budget Crossover | 150 | 380 | 45 | 450 | 6 |
-| **A4** Premium Sedan | 260 | 560 | 22 | 470 | 9 |
-| **A5** Mid-size SUV | 215 | 480 | 28 | 520 | 8 |
-| **A6** Long-range Estate | 230 | 600 | 25 | 580 | 7 |
-| direction | min | max | min | max | max |
-| preference function | V-shape with indifference (type V) | type V | V-shape (type III) | level (type IV) | usual (type I) |
-| thresholds | q = 5, p = 40 | q = 20, p = 120 | p = 20 | q = 50, p = 150 | – |
-| base weight | 0.30 | 0.25 | 0.15 | 0.15 | 0.15 |
+| Printer | Price [EUR] | Noise [dB(A)] | Max speed [mm/s] | Build volume [dm³] | Ease of use [1–5] | Nozzles |
+|---|---|---|---|---|---|---|
+| **A1** Creality K2 Plus Combo | 1187 | 50 | 600 | 42.875 | 3 | 1 |
+| **A2** Snapmaker U1 | 899 | 55 | 500 | 19.683 | 4 | 4 |
+| **A3** Bambu Lab H2D | 2125 | 49.1 | 1000 | 33.8 | 5 | 2 |
+| **A4** Prusa CORE One | 1282 | 48 | 600 | 14.85 | 4 | 1 |
+| direction | min | min | max | max | max | max |
+| weight – M1 points (**base**) | 0.30 | 0.15 | 0.10 | 0.12 | 0.08 | 0.25 |
+| weight – M2 rank sum | 0.286 | 0.190 | 0.095 | 0.143 | 0.048 | 0.238 |
 
-**Why these preference functions**
+All four printers pass the Task 1 "must pass" limits.
 
-* **Price and range** use the linear function with an indifference zone. A
-  difference of a few thousand PLN or a few km does not matter. Preference then
-  grows steadily and becomes full at 40 kPLN or 120 km.
-* **Charging time** uses V-shape: every minute counts, and 20 minutes counts as
-  a full preference.
-* **Boot capacity** uses the level function, because people judge it in steps
-  ("the pram fits / doesn't fit").
-* **Safety & equipment** uses the usual criterion. The score is already an
-  ordinal expert grade, so any better grade counts as a strict preference.
+**Preference functions.** PROMETHEE needs to know how a *difference* between
+two printers turns into a preference. These are my own choices, based on what
+I know about each criterion:
 
-## 2. PROMETHEE II – complete ranking
+| Criterion | Function | q | p | Why |
+|---|---|---|---|---|
+| Price | linear (type V) | 50 € | 600 € | Up to 50 € difference doesn't matter to me. At 600 € (about a quarter of the budget) the cheaper printer is clearly better. |
+| Noise | linear (type V) | 2 dB | 7 dB | In Task 1 I noted that the noise values come from different sources, so 1–3 dB differences "don't really mean much". q = 2 dB reflects that. About 7 dB is very audible. |
+| Max speed | linear (type V) | 50 mm/s | 400 mm/s | Small speed differences are not noticeable in practice. |
+| Build volume | linear (type V) | 2 dm³ | 20 dm³ | About 2 dm³ is noise; 20 dm³ is a different class of printer. |
+| Ease of use | level (type IV) | 0.5 | 1.5 | This is an ordinal score I gave myself: a difference of 1 point → preference 0.5, 2 or more points → 1. |
+| Nozzles | V-shape (type III) | – | 3 | Every extra nozzle counts; 1 vs 4 nozzles is a full preference. |
+
+## 2. PROMETHEE II – complete ranking (base weights M1)
 
 ![net flows](results/figures/01_net_flows.png)
 
-| Rank | Alternative | φ+ | φ− | φ (net) |
+| Rank | Printer | φ+ | φ− | φ |
 |---|---|---|---|---|
-| 1 | **A6 Long-range Estate** | 0.475 | 0.292 | **+0.183** |
-| 2 | A4 Premium Sedan | 0.450 | 0.308 | +0.142 |
-| 3 | A5 Mid-size SUV | 0.376 | 0.301 | +0.075 |
-| 4 | A2 Family Hatch | 0.348 | 0.359 | −0.011 |
-| 5 | A3 Budget Crossover | 0.281 | 0.432 | −0.150 |
-| 6 | A1 City Compact | 0.264 | 0.503 | −0.239 |
+| 1 | **A2 Snapmaker U1** | 0.446 | 0.242 | **+0.204** |
+| 2 | A1 Creality K2 Plus Combo | 0.239 | 0.241 | −0.002 |
+| 3 | A3 Bambu Lab H2D | 0.313 | 0.371 | −0.059 |
+| 4 | A4 Prusa CORE One | 0.168 | 0.311 | −0.142 |
 
-**Final ranking: A6 ≻ A4 ≻ A5 ≻ A2 ≻ A3 ≻ A1.**
+**Final ranking: U1 ≻ K2 Plus ≻ H2D ≻ CORE One.** Method M2 (rank sum) gives
+exactly the same order.
 
-**How far apart the alternatives are**
+**How far apart the printers are**
 
-* The gap between the top two is the smallest at the top of the ranking
-  (Δφ = 0.041). A6 wins, but not by much. The sensitivity analysis shows this
-  gap is the one that matters most.
-* A2 sits almost exactly at φ ≈ 0. It is the neutral middle option: neither
-  preferred to the rest nor dominated by it.
-* There is a clear break between the three better-equipped cars (A6, A4, A5,
-  φ > 0) and the three cheap ones (A2, A3, A1). The largest gap is A2 → A3
-  (Δφ = 0.139).
+* **The Snapmaker U1 is a clear winner.** Its lead over 2nd place is
+  Δφ = 0.206, more than the whole spread between places 2 and 4 (0.140).
+* **Places 2 and 3 are close.** K2 Plus and H2D differ by Δφ = 0.057. K2 Plus
+  is right at φ ≈ 0: it is the average option.
+* **The Prusa CORE One is last.** It has no strong point except low noise.
 
-**Strengths and weaknesses by criterion** (unicriterion net flows φⱼ):
+**Strengths and weaknesses** (unicriterion net flows φⱼ):
 
 ![profiles](results/figures/03_unicriterion_profiles.png)
 
-* **A6** is best or second-best on range (+0.84), boot (+0.70) and charging
-  (+0.35). Its weak points are price (−0.51) and a mediocre safety score
-  (−0.20). It wins because it has no large weakness on any criterion.
-* **A4** has the best profile on safety (+1.00), range and charging, but it is
-  by far the most expensive (−0.94 on price, the worst value in the table).
-  Price carries the largest weight (0.30), so this one weakness pushes A4 to
-  second place.
-* **A1 and A3** win clearly on price (+0.83 and +0.74) and lose on almost
-  everything else. A3 also has the slowest charging of all (−0.82).
+* **U1**
+  * Strong on the two criteria I weighted most: nozzles (+0.89, 4 toolheads)
+    and price (+0.68, the cheapest).
+  * Weak on noise (−0.79, the loudest at 55 dB), build volume (−0.51) and
+    speed (−0.43).
+  * Noise has only 15 % of the weight, so this weakness is not enough to stop
+    it winning.
+* **H2D**
+  * Best on speed (+1.0) and ease of use (+0.67); good on noise and volume.
+  * **Its price is −1.0.** It is more than 600 € more expensive than every
+    other printer, so on price it is fully dominated by all three. The most
+    important criterion (30 %) works entirely against it.
+* **K2 Plus**
+  * By far the largest build volume (+0.80) and a reasonable price.
+  * Lowest ease of use (−0.67) and only one nozzle (−0.44).
+* **CORE One**
+  * Quiet (+0.33).
+  * The smallest build volume (−0.70) and one nozzle (−0.44).
 
 ## 3. PROMETHEE I – partial ranking
 
 ![PROMETHEE I](results/figures/02_promethee_I.png)
 
-The partial preorder is:
+| | relation |
+|---|---|
+| U1 vs H2D, U1 vs CORE One | **U1 outranks** (higher φ+ *and* lower φ−) |
+| K2 Plus vs CORE One | K2 Plus outranks |
+| U1 vs K2 Plus | **incomparable** |
+| K2 Plus vs H2D, H2D vs CORE One | incomparable |
 
-```
-            A6
-          /    \
-        A4  R   A5        (A4 and A5 incomparable)
-          \    /
-            A2
-            |
-            A3
-            |
-            A1
-```
-
-* **A6 outranks every other alternative in PROMETHEE I**: it has the highest
-  φ+ and the lowest φ−. So A6 is the best choice in the partial ranking too,
-  not just in the complete one.
-* **A4 and A5 are incomparable**. A4 has the higher φ+ (0.450 vs 0.376) because
-  it is strong on many criteria. A5 has the lower φ− (0.301 vs 0.308) because
-  it is weak on fewer criteria, and in particular it is not dramatically
-  expensive. These are two different profiles: a high-end specialist and a
-  balanced compromise. PROMETHEE II puts A4 above A5, but PROMETHEE I warns
-  that this order hides a real trade-off.
-* The lower part of the ranking (A2 ≻ A3 ≻ A1) is the same in both methods.
+* **U1 vs K2 Plus: incomparable, but only on a technicality.** U1 has a much
+  higher φ+ (0.446 vs 0.239). K2 Plus's φ− is lower by only 0.001
+  (0.2411 vs 0.2421), which is a meaningless difference. In practice U1 is at
+  least as good as K2 Plus, and PROMETHEE II confirms this.
+* **H2D is incomparable with both K2 Plus and CORE One.** This is a real
+  conflict of profiles. H2D has strong advantages (speed, ease of use) and one
+  huge disadvantage (price). The other two are average everywhere.
+  PROMETHEE II puts H2D 3rd, but PROMETHEE I warns that its position depends
+  on how price is traded against quality.
 
 ## 4. Comparison of rankings
 
 ### 4.1 Different weight configurations
 
-| Scenario | C1 price | C2 range | C3 charge | C4 boot | C5 safety | PROMETHEE II ranking | τ vs base |
-|---|---|---|---|---|---|---|---|
-| Base | 0.30 | 0.25 | 0.15 | 0.15 | 0.15 | A6 ≻ A4 ≻ A5 ≻ A2 ≻ A3 ≻ A1 | 1.00 |
-| **Equal (0.2 each)** | 0.20 | 0.20 | 0.20 | 0.20 | 0.20 | **A4** ≻ A6 ≻ A5 ≻ A2 ≻ A3 ≻ A1 | 0.87 |
-| Cost-oriented | 0.50 | 0.15 | 0.10 | 0.10 | 0.15 | **A3** ≻ A2 ≻ A1 ≻ A5 ≻ A6 ≻ A4 | −0.60 |
-| Travel-oriented | 0.15 | 0.40 | 0.25 | 0.10 | 0.10 | A6 ≻ A4 ≻ A5 ≻ A2 ≻ A3 ≻ A1 | 1.00 |
-| Practicality | 0.15 | 0.15 | 0.10 | 0.35 | 0.25 | **A4** ≻ A6 ≻ A5 ≻ A2 ≻ A3 ≻ A1 | 0.87 |
-| Safety-first | 0.20 | 0.15 | 0.10 | 0.15 | 0.40 | **A4** ≻ A5 ≻ A2 ≻ A6 ≻ A3 ≻ A1 | 0.60 |
+The first two rows are the Task 1 weighting methods. The last three are the
+Task 1 "what if my weights were different?" cases. I added "Equal (1/6 each)"
+and "0.2 / 0.15 balanced" (0.2 for my two key criteria, 0.15 for the others).
+
+| Weights | Price | Noise | Speed | Volume | Ease | Nozzles | PROMETHEE II ranking | τ vs base |
+|---|---|---|---|---|---|---|---|---|
+| **M1 points (base)** | .30 | .15 | .10 | .12 | .08 | .25 | **U1** ≻ K2 ≻ H2D ≻ Prusa | 1.00 |
+| M2 rank sum | .286 | .190 | .095 | .143 | .048 | .238 | **U1** ≻ K2 ≻ H2D ≻ Prusa | 1.00 |
+| Equal (1/6 each) | .167 | .167 | .167 | .167 | .167 | .167 | **H2D** ≻ U1 ≻ K2 ≻ Prusa | 0.33 |
+| 0.2 / 0.15 balanced | .20 | .15 | .15 | .15 | .15 | .20 | **H2D** ≻ U1 ≻ K2 ≻ Prusa | 0.33 |
+| Price matters less | .10 | .19 | .13 | .15 | .10 | .33 | **H2D** ≻ U1 ≻ K2 ≻ Prusa | 0.33 |
+| No multi-colour needed | .40 | .20 | .133 | .16 | .107 | 0 | **K2** ≻ U1 ≻ Prusa ≻ H2D | 0.33 |
+| Big prints | .25 | .12 | .08 | .35 | .08 | .12 | **K2** ≻ H2D ≻ U1 ≻ Prusa | 0.33 |
 
 ![ranking comparison](results/figures/04_ranking_comparison.png)
 
-* **With equal weights (0.2 each)**, A4 and A6 swap places. Lowering the price
-  weight from 0.30 to 0.20 is enough for the expensive A4 to win.
-* **The cost-oriented scenario almost reverses the ranking** (τ = −0.60). The
-  cheap cars A3, A2 and A1 move to the top and A4 drops to last. This is the
-  only scenario that changes the overall structure of the ranking.
-* The **travel-oriented** scenario gives exactly the base ranking. Range and
-  charging are where A6 and A4 are already strongest, so giving them more
-  weight changes nothing.
-* **Safety-first** drops A6 to 4th place. A6's weak safety score (7) becomes
-  costly.
-* **Stable across all scenarios except cost-oriented:** A1 and A3 are always
-  in the bottom two, A5 is always 2nd or 3rd, and A2 is always 3rd or 4th.
+* **Both of my weighting methods (M1 and M2) give the same ranking.** The
+  recommendation does not depend on how I turned my priorities into numbers.
+* **H2D wins whenever price stops dominating** (equal weights, the balanced
+  0.2/0.15 set, or "price matters less"). It is "honestly the better machine",
+  as I wrote in Task 1.
+* **K2 Plus wins when multi-colour is not needed or when I want big prints.**
+  K2 Plus is the volume specialist.
+* **The CORE One is last in 6 of the 7 scenarios.** It never comes close to
+  winning.
 
-### 4.2 PROMETHEE vs. weighted sum (P × W)
+### 4.2 PROMETHEE vs. the Task 1 WSM (P × W)
 
-For comparison I computed a simple additive score: the min–max normalised
-performance matrix multiplied by the weight vector, S = N·w.
+The WSM uses exactly the Task 1 method: ratio normalisation (min/x for cost
+criteria, x/max for benefit criteria) multiplied by the weights. This
+reproduces the spreadsheet: U1 0.850, H2D 0.673, K2 0.662, Prusa 0.588.
 
-| Scenario | Kendall τ (PROMETHEE II vs P×W) | Difference |
-|---|---|---|
-| Base | 1.00 | identical |
-| Equal (0.2) | 1.00 | identical |
-| Travel-oriented | 1.00 | identical |
-| Cost-oriented | 0.87 | P×W puts A2 first, PROMETHEE puts A3 first |
-| Practicality | 0.87 | P×W puts A6 first, PROMETHEE puts A4 first |
-| Safety-first | 0.87 | P×W: A6 3rd and A2 4th; PROMETHEE: A2 3rd and A6 4th |
+| Weights | WSM winner (Task 1) | PROMETHEE II winner | τ (PROMETHEE vs WSM) |
+|---|---|---|---|
+| M1 points | U1 | U1 | 0.67 (2nd/3rd swapped) |
+| M2 rank sum | U1 | U1 | 1.00 |
+| Equal | H2D | H2D | 1.00 |
+| 0.2 / 0.15 balanced | **U1** | **H2D** | 0.67 |
+| Price matters less | **U1** | **H2D** | 0.67 |
+| No multi-colour needed | **U1** (0.800 vs 0.799 – a tie) | **K2 Plus** | 0.33 |
+| Big prints | K2 Plus | K2 Plus | 0.67 |
 
-The two methods agree on the base ranking. That strengthens the
-recommendation, because it does not depend on the aggregation method. Where
-they differ, the cause is how PROMETHEE treats differences in performance:
-
-* P×W is fully **compensatory and linear**. A 1-point gap in safety
-  (9 vs 8) is worth exactly as much as half of a 2-point gap. Under the usual
-  criterion, PROMETHEE counts that 1-point gap as a *full* preference. A4 has
-  the best safety score, so it benefits whenever safety gets a large weight
-  (Practicality, Safety-first).
-* The p-thresholds cap how much a large advantage can count. In P×W, A1's
-  80-kPLN price advantage over A2 keeps adding to its score, but PROMETHEE
-  stops at "fully preferred" once the gap reaches 40 kPLN. The indifference
-  thresholds q, on the other hand, ignore small gaps. This explains the
-  different winners in the cost-oriented scenario.
+* **Both methods choose the Snapmaker U1 with my real weights (M1 and M2).**
+  Task 1's main conclusion still holds.
+* **2nd and 3rd place swap.** In the WSM, H2D is 2nd (0.673 vs 0.662). In
+  PROMETHEE, K2 Plus is 2nd. The WSM gives H2D partial credit on price
+  (899/2125 = 0.42 of the best value). PROMETHEE counts H2D's price
+  disadvantage as a *full* preference against it, because the gap is more
+  than p = 600 € compared with every printer.
+* **The WSM is more favourable to U1.** In three scenarios the WSM still picks
+  U1 where PROMETHEE does not. The reason is the ratio normalisation: U1 has
+  4 nozzles and the others 1–2, so they get only 0.25–0.5 of the nozzle score,
+  a very big penalty. In PROMETHEE, the nozzle advantage is limited by the
+  preference function, and U1's weak points (noise, volume, speed) count with
+  their real size.
+* **"No multi-colour needed":** the WSM tie (0.800 vs 0.799) becomes a clear
+  PROMETHEE win for K2 Plus (φ = +0.145 vs −0.025).
 
 ## 5. Sensitivity analysis
 
 ### 5.1 Weight stability intervals (exact)
 
-PROMETHEE II net flows are linear in the weights: φ(a) = Σⱼ wⱼ φⱼ(a). So when
-one weight changes and the others are rescaled proportionally, each pair of
-alternatives can swap order at most once, and the swap point can be computed
-exactly (`stability_intervals`).
+PROMETHEE II net flows are linear in the weights, φ = Σⱼ wⱼ φⱼ. When one weight
+changes, the other weights keep their proportions, and the point where two
+printers swap places can be computed exactly.
 
-| Criterion | Base w | Full ranking unchanged for w ∈ | A6 stays best for w ∈ | What changes outside |
+| Criterion | Base w | Full ranking unchanged for w ∈ | U1 stays best for w ∈ | Who wins outside |
 |---|---|---|---|---|
-| C1 Price | 0.30 | [0.226, 0.365] | [0.226, 0.447] | < 0.226: A4 becomes 1st; > 0.447: A3 becomes 1st |
-| C2 Range | 0.25 | [0.147, 1.000] | [0.117, 1.000] | < 0.147: A5 moves ahead of A4 |
-| C3 Charging | 0.15 | [0.000, 0.265] | [0.000, 0.333] | > 0.265: A1/A3 swap; > 0.333: A4 1st |
-| C4 Boot | 0.15 | [0.074, 0.369] | [0.074, 1.000] | > 0.369: A3/A2 swap; < 0.074: A4 1st |
-| C5 Safety | 0.15 | [0.043, 0.178] | [0.000, 0.178] | **> 0.178: A4 becomes 1st** |
+| Price | 0.30 | [0.266, 0.349] | **[0.170, 1.000]** | < 0.170 → H2D |
+| Noise | 0.15 | [0.000, 0.296] | [0.000, 0.296] | > 0.296 → K2 Plus |
+| Max speed | 0.10 | [0.037, 0.138] | [0.000, 0.240] | > 0.240 → H2D |
+| Build volume | 0.12 | [0.048, 0.240] | [0.000, 0.240] | > 0.240 → K2 Plus |
+| Ease of use | 0.08 | [0.000, 0.117] | [0.000, 0.340] | > 0.340 → H2D |
+| Nozzles | 0.25 | [0.113, 0.334] | **[0.113, 1.000]** | < 0.113 → K2 Plus |
 
 ![weight sweeps](results/figures/05_weight_sweeps.png)
 
-* **The choice of A6 is most sensitive to the safety weight.** Raising it from
-  0.15 to 0.18 (+0.03) is enough for A4 to win. Lowering the price weight below
-  0.226 has the same effect. So the decision between A6 and A4 comes down to
-  how much the family is willing to pay for top safety.
-* **Range is the most robust criterion.** Any range weight from 0.117 to 1
-  keeps A6 first, because A6 has the longest range.
-* **Price is the most influential criterion overall.** Its line crossings are
-  the steepest (see the C1 panel): above roughly 0.45 the whole ranking flips
-  toward the cheap cars.
+* **The winner is stable.** U1 stays first for any price weight above 0.17
+  and any nozzle weight above 0.113. Each of the other criteria would need
+  at least double its current weight to change the winner.
+* **What would beat U1:** H2D needs more weight on speed (> 0.24) or ease of
+  use (> 0.34). K2 Plus needs more weight on noise (> 0.30) or build volume
+  (> 0.24).
+* **Positions 2–4 are less stable** than the winner. The full ranking holds
+  only for price weights in [0.266, 0.349] and speed weights in
+  [0.037, 0.138]. This is the K2 Plus / H2D swap already seen in Section 4.
 
 ### 5.2 Monte-Carlo rank acceptability (20 000 weight vectors)
 
 ![rank acceptability](results/figures/06_rank_acceptability.png)
 
-| | ±20 % around base | ±50 % around base | any weights (uniform) |
+| | ±20 % around M1 | ±50 % around M1 | any weights (uniform) |
 |---|---|---|---|
-| P(A6 is 1st) | **93 %** | **67 %** | 38 % |
-| P(A4 is 1st) | 7 % | 28 % | **48 %** |
-| P(A5 is 1st / 2nd / 3rd) | 0 / 1 / 99 % | 1 / 15 / 82 % | 1 / 26 / 63 % |
-| P(A1 is last) | 100 % | 94 % | 63 % |
-| mean rank A6 / A4 | 1.07 / 1.94 | 1.40 / 2.14 | 2.28 / 2.14 |
+| P(U1 is 1st) | **100 %** | **92 %** | 23 % |
+| P(H2D is 1st) | 0 % | 6 % | **64 %** |
+| P(K2 Plus is 1st) | 0 % | 3 % | 12 % |
+| P(CORE One is 1st) | 0 % | 0 % | 1 % |
+| mean rank U1 / K2 / H2D / Prusa | 1.00 / 2.14 / 2.89 / 3.97 | 1.11 / 2.30 / 2.85 / 3.74 | 2.51 / 2.61 / 1.61 / 3.28 |
 
-* If the base weights are roughly right (±20 %), **A6 is first in 93 % of
-  cases**, and ranks 3–6 never change.
-* Even with ±50 % uncertainty, A6 is still the most likely winner (67 %).
-* With no information about the weights at all, A4 wins slightly more often
-  (48 % vs 38 %). Equal-ish random weights give price relatively less weight
-  than the base does. **A6 vs A4 is the only real dilemma.**
-* **A5 is never first but almost always 2nd or 3rd.** It is the robust
-  compromise choice for a cautious decision maker.
-* **A1 and A3 are first only under extreme weights** (about 4–5 % of random
-  vectors). For practical purposes they can be excluded.
+* **With my weights, U1 is always first.** Even if every weight is uncertain
+  by ±50 %, U1 still wins 92 % of the time.
+* **With no information about priorities (any weights), H2D is the most
+  likely winner (64 %).** Objectively it is the strongest machine. U1 wins
+  *because of my priorities*: low budget and multi-colour printing.
+* **The CORE One almost never wins** (1 % even with random weights). It is
+  dominated by the others in most situations.
 
 ### 5.3 Sensitivity to preference functions and thresholds
 
-| Variant | Ranking | τ vs base |
-|---|---|---|
-| all thresholds × 0.25 | A6 ≻ A5 ≻ A4 ≻ A2 ≻ A3 ≻ A1 | 0.87 |
-| all thresholds × 0.5 … × 1.25 | identical to base | 1.00 |
-| all thresholds × 1.5 / × 2 | A4 ≻ A6 ≻ A5 ≻ A2 ≻ A3 ≻ A1 | 0.87 |
-| all criteria "usual" (type I) | identical to base | 1.00 |
+| Variant | Ranking | τ vs base | Winner |
+|---|---|---|---|
+| all thresholds × 0.25 / × 0.5 | U1 ≻ H2D ≻ K2 ≻ Prusa | 0.67 | U1 |
+| all thresholds × 0.75 … × 1.25 | identical to base | 1.00 | U1 |
+| all thresholds × 1.5 / × 2 | U1 ≻ K2 ≻ Prusa ≻ H2D | 0.67 | U1 |
+| all criteria "usual" (type I) | U1 ≻ H2D ≻ K2 ≻ Prusa | 0.67 | U1 |
 
 ![threshold sweeps](results/figures/07_threshold_sweeps.png)
 
-* The ranking does not change when all thresholds are scaled anywhere from
-  ×0.5 to ×1.25, so the parameter choice is not driving the result.
-* Very large thresholds (×1.5 and above) favour A4. With larger p, A4's large
-  price gap no longer counts as a full preference against it, so its price
-  penalty shrinks.
-* Very small thresholds (×0.25) bring A5 ahead of A4.
-* None of these variants moves anything outside the top three.
+* **U1 is first in every variant.** The recommendation does not depend on my
+  threshold choices.
+* **Only 2nd/3rd place depends on the thresholds.** The choice is between K2
+  Plus and H2D, and the deciding parameter is the price threshold p. If price
+  differences above 1250 € still counted as only *partial* preferences, H2D
+  would move up to 2nd place.
+* K2 Plus would beat U1 only with a nozzle threshold above about 8 nozzles.
+  That makes no sense here, since the largest possible difference is 3.
 
-## 6. Extension – group decision-making (PROMETHEE GDSS)
+### 5.4 What if the Bambu H2D goes on sale? (continues Task 1, Section 6)
 
-**Why this extension.** Buying a family car is a joint decision by several
-people with different priorities. Sorting (SORT) is not useful here because
-there is no reference class to assign alternatives to. A portfolio approach
-(PROMETHEE V) is not useful either, because only one car is bought.
+![what-if](results/figures/08_what_if.png)
 
-**Method.** Each decision maker k has their own weights wᵏ, and everyone shares
-the performance table and preference functions. Individual net flows φᵏ are
-aggregated with importance coefficients λₖ:
-φ_group = Σₖ λₖ φᵏ. Because the flows are linear in the weights, this is the
-same as running PROMETHEE II with the weights Σₖ λₖ wᵏ (checked in
-`tests/test_promethee.py`).
+| H2D price [EUR] | φ U1 | φ H2D | Winner |
+|---|---|---|---|
+| 2125 (now) | +0.204 | −0.059 | U1 |
+| 1600 | +0.204 | +0.026 | U1 |
+| **≈ 1297** | +0.166 | +0.166 | tie |
+| 1000 | +0.113 | +0.299 | **H2D** |
+| 700 | +0.076 | +0.444 | **H2D** |
 
-| DM | λ | C1 | C2 | C3 | C4 | C5 | Individual ranking | τ vs group |
-|---|---|---|---|---|---|---|---|---|
-| DM1 Parent (budget holder) | 0.40 | 0.45 | 0.15 | 0.10 | 0.15 | 0.15 | A3 ≻ A2 ≻ A5 ≻ A6 ≻ A1 ≻ A4 | −0.47 |
-| DM2 Commuter | 0.35 | 0.15 | 0.40 | 0.25 | 0.05 | 0.15 | A4 ≻ A6 ≻ A5 ≻ A2 ≻ A3 ≻ A1 | 1.00 |
-| DM3 Second parent (safety) | 0.25 | 0.20 | 0.10 | 0.05 | 0.25 | 0.40 | A4 ≻ A5 ≻ A6 ≻ A2 ≻ A3 ≻ A1 | 0.87 |
+* **PROMETHEE: H2D becomes the best choice below about 1297 EUR**, a discount
+  of about 39 %.
+* In Task 1 the WSM said H2D "doesn't win even if it costs the same as the
+  U1". **PROMETHEE gives a different answer.** In the WSM, U1's nozzle
+  advantage (4 vs 2) is worth a fixed 0.125 of the score, which H2D cannot
+  make up. In PROMETHEE, H2D's clear superiority on speed, ease of use,
+  volume and noise outweighs it once price no longer works against H2D.
+* **Above about 1880 EUR, H2D's φ stops changing.** It is already more than
+  600 € (= p) more expensive than every other printer, so further price
+  increases cannot make it any worse on price.
 
-**Group ranking:** **A4 (+0.197) ≻ A6 (+0.148) ≻ A5 (+0.097)** ≻ A2 (+0.021)
-≻ A3 (−0.192) ≻ A1 (−0.272)
+## 6. Extension – FlowSort (PROMETHEE sorting)
 
-![group flows](results/figures/08_group_flows.png)
-![importance simplex](results/figures/09_group_importance_simplex.png)
+**Why SORT.**
+* There is only **one decision maker** (me), so a group analysis would be
+  artificial.
+* I buy **one printer**, so a portfolio (PROMETHEE V) would be trivial.
+* The ranking is **relative**: it only says which of these 4 printers is
+  best, not whether it is actually good.
+* Task 1 already has absolute "must pass" limits, which work naturally as the
+  lowest profile of a sorting model.
+* With FlowSort, each printer is compared only with fixed reference profiles.
+  Its class does not depend on which other printers are in the comparison.
 
-* **DM2 and DM3 largely agree** (τ = 0.87). **DM1 disagrees with both**
-  (τ = −0.47 and −0.33): DM1's priority is the purchase price.
-* The group picks **A4**, which is DM1's *last* choice. This is not a
-  calculation error. DM1's net flows are all close to zero (between −0.09 and
-  +0.05). The budget holder sees the cars as roughly equivalent, so DM1's
-  ranking has little "strength". DM2 and DM3 have strong, consistent
-  preferences that dominate the weighted sum even though DM1 has the largest
-  importance (0.40). This is a known property of flow-based GDSS aggregation,
-  and the decision makers should be told about it before the result is used.
-* **Robustness to the importance split.** In the triangle above, each point is
-  one possible split of importance between the three DMs, coloured by the
-  alternative that wins. A4 wins over most of the triangle. For random DM
-  importances it is the group winner in **82 %** of cases (A6 12 %, A5 4 %).
-  A6 wins when DM1 and DM2 together hold most of the importance and DM3 has
-  little. A2 and A3 win only when DM1 decides almost alone.
-* **A5 is a reasonable compromise.** It is 3rd for DM1, 3rd for DM2 and 2nd
-  for DM3, and it is nobody's worst option.
+**Model.** There are three ordered classes, *Very good*, *Good* and
+*Acceptable*, defined by four limiting profiles. Each printer is compared with
+the profiles, using the same preference functions and weights as in the
+ranking.
+
+| Profile | Price | Noise | Speed | Volume | Ease | Nozzles |
+|---|---|---|---|---|---|---|
+| r1 ideal (best value I could hope for in budget) | 800 | 45 | 1000 | 45 | 5 | 4 |
+| r2 very good / good | 1200 | 50 | 650 | 30 | 4 | 2 |
+| r3 good / acceptable | 1800 | 55 | 450 | 20 | 3.5 | 1.5 |
+| r4 **must-pass limits from Task 1** | 2500 | 60 | 300 | 14 | 3 | 1 |
+
+A printer is assigned to class Cₖ if φ(rₖ) ≥ φ(a) > φ(rₖ₊₁). The flows are
+computed on the set {r1, …, r4, a}. The φ+ and φ− assignments are also
+checked; when they differ, the printer belongs to an interval of classes.
+
+![flowsort](results/figures/09_flowsort.png)
+
+| Printer | φ (vs profiles) | Class (φ) | Class (φ+) | Class (φ−) |
+|---|---|---|---|---|
+| A2 Snapmaker U1 | +0.237 | **Very good** | Very good | Very good |
+| A1 Creality K2 Plus Combo | +0.096 | Good | Good | Good |
+| A3 Bambu Lab H2D | +0.046 | Good | Good | Good |
+| A4 Prusa CORE One | −0.008 | Good | Good | Good |
+
+* **Only the Snapmaker U1 reaches "Very good"** with my weights. The other
+  three are "Good".
+* **No printer is only "Acceptable" or below the limits.** This matches the
+  Task 1 check that all four printers are within my limits, and the margin is
+  large. Even the CORE One (φ = −0.008) is far above the good/acceptable
+  boundary (φ ≈ −0.33).
+* **The φ+ and φ− assignments agree in every case.** No assignment is
+  imprecise.
+
+**Sorting under different weights and robustness**
+
+| Weights | K2 Plus | U1 | H2D | CORE One |
+|---|---|---|---|---|
+| M1 / M2 | Good | **Very good** | Good | Good |
+| Equal | Good | Good | **Very good** | Good |
+| 0.2 / 0.15, Price matters less | Good | **Very good** | **Very good** | Good |
+| No multi-colour, Big prints | **Very good** | Good | Good | Good |
+
+![flowsort acceptability](results/figures/10_flowsort_acceptability.png)
+
+* **The assignment is robust.** With ±20 % weight uncertainty, the classes
+  above never change (100 %). With ±50 % uncertainty, U1 stays "Very good"
+  in 94 % of samples.
+* **For any random weights, H2D is "Very good" most often (73 %).** This is
+  the same conclusion as Section 5.2: it is the strongest machine overall,
+  but not the best fit for my priorities.
+* **The CORE One is "Very good" in only 3 % of random weight vectors.**
+* Under "0.2 / 0.15 balanced" and "Price matters less", **both U1 and H2D are
+  "Very good"**. This shows something a ranking cannot: in those scenarios
+  both printers are genuinely excellent buys, not just "1st and 2nd".
 
 ## 7. Conclusions
 
-1. **Recommendation with the base weights: A6 Long-range Estate.** It is first
-   in PROMETHEE II, outranks every alternative in PROMETHEE I, gives the same
-   result with the weighted sum (P×W), and stays first for ±20 % weight
-   uncertainty in 93 % of cases.
-2. **The real decision is between A6 and A4.** A4 wins under equal weights,
-   with a higher safety weight (above 0.178) or a lower price weight (below
-   0.226), and in the group setting (82 % of importance splits). In short: if
-   the family values top safety more than about 20 kPLN in savings over A6,
-   A4 is the better choice.
-3. **A5 Mid-size SUV is the safe compromise.** It is incomparable with A4 in
-   PROMETHEE I, almost always 2nd or 3rd, and acceptable to every decision
-   maker.
-4. **A1 and A3 should be rejected** unless price gets more than about 45 % of
-   the total weight. Their cheapness cannot make up for weak range, charging
-   and safety.
-5. **Most influential criteria:** price (the steepest changes, and the only
-   one that can flip the whole ranking) and safety (the narrowest stability
-   interval). The result hardly depends on the range weight or on the exact
-   threshold values.
+1. **Recommendation: Snapmaker U1.**
+   * It is first in PROMETHEE II with both Task 1 weighting methods.
+   * It outranks H2D and CORE One in PROMETHEE I.
+   * It is the only printer sorted as "Very good".
+   * It stays first for ±20 % weight uncertainty (100 %), ±50 % (92 %), and
+     every threshold variant.
+
+   **My Task 1 guess and the WSM result are confirmed by PROMETHEE.**
+2. **Why U1 wins:** my two most important criteria, price (0.30) and nozzles
+   (0.25), are exactly U1's strengths. Its weaknesses (loudest, small volume,
+   slowest) are on criteria with lower weights.
+3. **Bambu H2D is the objectively strongest printer.** It wins with equal
+   weights, when price matters less, and in 64 % of random weight vectors.
+   It loses only because of its price, and it would become my best choice
+   below about 1297 €. This is where PROMETHEE differs most from the Task 1
+   WSM, which said H2D never wins.
+4. **Creality K2 Plus is the choice if I do not need multi-colour printing or
+   if I want big prints.** PROMETHEE gives it a clear win in the
+   "no multi-colour" case, where the WSM had only a tie.
+5. **Prusa CORE One is consistently last.** It is a good printer (it is in
+   the "Good" class), but it is dominated by the others for my needs.
+6. **Weak points of the analysis:**
+   * As already noted in Task 1: only 4 printers, noise values from different
+     sources (handled here with q = 2 dB), and ease of use is a subjective
+     score.
+   * New in PROMETHEE: the preference thresholds and the FlowSort profiles
+     are also my own judgement. The threshold analysis shows they do not
+     affect the winner, but they do affect places 2 and 3.
 
 ---
 
@@ -316,6 +369,6 @@ same as running PROMETHEE II with the weights Σₖ λₖ wᵏ (checked in
 
 ```bash
 pip install -r requirements.txt
-python run_analysis.py              # or: python run_analysis.py my_problem.json
+python run_analysis.py
 python -m pytest -q
 ```

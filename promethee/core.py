@@ -88,7 +88,7 @@ class Problem:
     X: np.ndarray
     weights: np.ndarray
     weight_scenarios: dict[str, np.ndarray] = field(default_factory=dict)
-    group: dict = field(default_factory=dict)
+    config: dict = field(default_factory=dict)
 
     @property
     def labels(self) -> list[str]:
@@ -109,7 +109,7 @@ class Problem:
             X=X,
             weights=normalise(cfg["weights"]),
             weight_scenarios=scen,
-            group=cfg.get("group", {}),
+            config=cfg,
         )
 
 
@@ -213,16 +213,32 @@ def promethee_I(res: PrometheeResult, tol: float = 1e-9) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
-def weighted_sum(X: np.ndarray, criteria: list[Criterion], w) -> np.ndarray:
-    """Simple additive weighting on min-max normalised performances."""
-    w = normalise(w)
-    lo, hi = X.min(axis=0), X.max(axis=0)
-    span = np.where(hi > lo, hi - lo, 1.0)
-    N = (X - lo) / span
+def normalised_matrix(X: np.ndarray, criteria: list[Criterion], method: str = "ratio"
+                      ) -> np.ndarray:
+    """Normalised performances, higher = better.
+
+    ratio  : x / max (benefit), min / x (cost) – the normalisation used in Task 1
+    minmax : (x - min) / (max - min), reversed for cost criteria
+    """
+    X = np.asarray(X, float)
+    N = np.empty_like(X)
     for j, c in enumerate(criteria):
-        if c.direction == "min":
-            N[:, j] = 1.0 - N[:, j]
-    return N @ w
+        col = X[:, j]
+        if method == "ratio":
+            N[:, j] = col.min() / col if c.direction == "min" else col / col.max()
+        elif method == "minmax":
+            span = col.max() - col.min() or 1.0
+            v = (col - col.min()) / span
+            N[:, j] = 1.0 - v if c.direction == "min" else v
+        else:
+            raise ValueError(method)
+    return N
+
+
+def weighted_sum(X: np.ndarray, criteria: list[Criterion], w, method: str = "ratio"
+                 ) -> np.ndarray:
+    """WSM score S = N x W (simple additive weighting)."""
+    return normalised_matrix(X, criteria, method) @ normalise(w)
 
 
 # ---------------------------------------------------------------------------

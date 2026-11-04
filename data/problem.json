@@ -1,43 +1,52 @@
 {
-  "title": "Selection of an electric car for a family",
+  "title": "Which 3D printer should I buy? (FDM printer for home, budget max 2500 EUR)",
+  "source": "Task 1 spreadsheet KK_MCDM_1.xlsx (data checked 22.10.2026)",
   "alternatives": {
-    "A1": "City Compact",
-    "A2": "Family Hatch",
-    "A3": "Budget Crossover",
-    "A4": "Premium Sedan",
-    "A5": "Mid-size SUV",
-    "A6": "Long-range Estate"
+    "A1": "Creality K2 Plus Combo",
+    "A2": "Snapmaker U1",
+    "A3": "Bambu Lab H2D",
+    "A4": "Prusa CORE One"
   },
   "criteria": [
-    {"id": "C1", "name": "Price [kPLN]",           "direction": "min", "function": "linear", "q": 5,  "p": 40},
-    {"id": "C2", "name": "Range WLTP [km]",        "direction": "max", "function": "linear", "q": 20, "p": 120},
-    {"id": "C3", "name": "Charging 10-80% [min]",  "direction": "min", "function": "v-shape",        "p": 20},
-    {"id": "C4", "name": "Boot capacity [l]",      "direction": "max", "function": "level",  "q": 50, "p": 150},
-    {"id": "C5", "name": "Safety & equipment [1-10]", "direction": "max", "function": "usual"}
+    {"id": "C1", "name": "Price [EUR]",         "direction": "min", "function": "linear",  "q": 50,  "p": 600},
+    {"id": "C2", "name": "Noise [dB(A)]",       "direction": "min", "function": "linear",  "q": 2,   "p": 7},
+    {"id": "C3", "name": "Max speed [mm/s]",    "direction": "max", "function": "linear",  "q": 50,  "p": 400},
+    {"id": "C4", "name": "Build volume [dm3]",  "direction": "max", "function": "linear",  "q": 2,   "p": 20},
+    {"id": "C5", "name": "Ease of use [1-5]",   "direction": "max", "function": "level",   "q": 0.5, "p": 1.5},
+    {"id": "C6", "name": "Nozzles [pcs]",       "direction": "max", "function": "v-shape",           "p": 3}
   ],
   "performance": {
-    "A1": [140, 320, 35, 300, 6],
-    "A2": [185, 420, 30, 385, 8],
-    "A3": [150, 380, 45, 450, 6],
-    "A4": [260, 560, 22, 470, 9],
-    "A5": [215, 480, 28, 520, 8],
-    "A6": [230, 600, 25, 580, 7]
+    "A1": [1187, 50,   600,  42.875, 3, 1],
+    "A2": [899,  55,   500,  19.683, 4, 4],
+    "A3": [2125, 49.1, 1000, 33.8,   5, 2],
+    "A4": [1282, 48,   600,  14.85,  4, 1]
   },
-  "weights": [0.30, 0.25, 0.15, 0.15, 0.15],
+  "weights": [0.30, 0.15, 0.10, 0.12, 0.08, 0.25],
   "weight_scenarios": {
-    "Base":           [0.30, 0.25, 0.15, 0.15, 0.15],
-    "Equal (0.2 each)": [0.20, 0.20, 0.20, 0.20, 0.20],
-    "Cost-oriented":  [0.50, 0.15, 0.10, 0.10, 0.15],
-    "Travel-oriented":[0.15, 0.40, 0.25, 0.10, 0.10],
-    "Practicality":   [0.15, 0.15, 0.10, 0.35, 0.25],
-    "Safety-first":   [0.20, 0.15, 0.10, 0.15, 0.40]
+    "M1 points (base)":         [0.30, 0.15, 0.10, 0.12, 0.08, 0.25],
+    "M2 rank sum":              [0.285714, 0.190476, 0.095238, 0.142857, 0.047619, 0.238095],
+    "Equal (1/6 each)":         [1, 1, 1, 1, 1, 1],
+    "0.2 / 0.15 balanced":      [0.20, 0.15, 0.15, 0.15, 0.15, 0.20],
+    "Price matters less":       [0.10, 0.19, 0.13, 0.15, 0.10, 0.33],
+    "No multi-colour needed":   [0.40, 0.20, 0.133333, 0.16, 0.106667, 0.0],
+    "Big prints":               [0.25, 0.12, 0.08, 0.35, 0.08, 0.12]
   },
-  "group": {
-    "description": "Three family members decide together; each has their own weights, the group aggregates net flows with decision-maker importance weights (PROMETHEE GDSS).",
-    "decision_makers": {
-      "DM1 Parent (budget holder)": {"importance": 0.40, "weights": [0.45, 0.15, 0.10, 0.15, 0.15]},
-      "DM2 Commuter":               {"importance": 0.35, "weights": [0.15, 0.40, 0.25, 0.05, 0.15]},
-      "DM3 Second parent (safety)": {"importance": 0.25, "weights": [0.20, 0.10, 0.05, 0.25, 0.40]}
+  "weighted_sum_normalisation": "ratio",
+  "what_if": {
+    "description": "What if the Bambu Lab H2D goes on sale? (Task 1, section 6)",
+    "alternative": "A3",
+    "criterion": "C1",
+    "values_from": 700,
+    "values_to": 2500
+  },
+  "sort": {
+    "description": "FlowSort: assign each printer to a quality class using limiting profiles. The worst profile is the Task 1 'must pass' limits.",
+    "classes": ["Very good", "Good", "Acceptable"],
+    "profiles": {
+      "r1 ideal (best value in budget)": [800,  45, 1000, 45, 5,   4],
+      "r2 very good / good":             [1200, 50, 650,  30, 4,   2],
+      "r3 good / acceptable":            [1800, 55, 450,  20, 3.5, 1.5],
+      "r4 must-pass limits (Task 1)":    [2500, 60, 300,  14, 3,   1]
     }
   }
 }
