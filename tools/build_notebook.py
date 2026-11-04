@@ -59,8 +59,17 @@ for rel in EMBED:
         cells.append(md("""
 ## 1. Problem data
 
-Printers, criteria (direction, preference function, thresholds q / p / s), weights,
-weight scenarios, the fuzzy values and the efficiency settings.
+All inputs are in this one file (the code contains no numbers from Task 1):
+
+| part of the file | what it is |
+|---|---|
+| `alternatives` | the 4 printers A1–A4 |
+| `criteria` | the 6 criteria: `direction` (min = lower is better, max = higher is better), `function` (preference function) and its thresholds `q`, `p` |
+| `performance` | the decision matrix from Task 1 (one row per printer, columns = criteria C1–C6) |
+| `weights` | my weights from Task 1, method 1 (points) |
+| `weight_scenarios` | other weight sets for the comparison with the WSM (incl. method 2 and the Task 1 "what if" cases) |
+| `fuzzy` | which values are uncertain (triangular fuzzy numbers) and the fuzzy weights (±10 %) |
+| `efficiency` | which criterion is the input (price); all others are outputs |
 """))
     cells.append(code(f"%%writefile {rel}\n{src}"))
 
@@ -72,15 +81,16 @@ cells += [
 
     md("## 3. PROMETHEE I and II"),
     show("Performance table (from Task 1)", csv="performance_table.csv"),
-    show("Preference functions and weights", csv="criteria_parameters.csv"),
+    show("Inputs overview – what each input is and what it means", csv="inputs_overview.csv"),
     interp("""
-The data and the weights (method 1, points) are the same as in Task 1. What is new for PROMETHEE
-is the preference function of each criterion, which says how big a difference has to be before it
-matters to me. **q** is the difference I ignore and **p** is the difference from which one printer is
-clearly better. For example, for noise q = 2 dB, because my noise values come from different
-sources and 1–2 dB is probably just measurement noise, and p = 7 dB, which you clearly hear.
-Price is very important to me, so already 300 € (p) is a decisive difference. Ease of use is my
-own 1–5 score, so I used the level function (1 point = half preference, 2 points = full).
+One row per criterion. The decision matrix and the weights are the same as in Task 1. New for
+PROMETHEE is the **preference function**: it says how big a difference has to be before it
+matters to me. **q** = the difference I ignore, **p** = the difference from which one printer is
+clearly better (column "what the thresholds mean"). For noise q = 2 dB because my noise values come
+from different sources, and p = 7 dB, which you clearly hear. Price is very important to me, so
+already 300 € is decisive. Ease of use is my own 1–5 score, so I used the level function.
+The last two columns are the inputs for the F-PROMETHEE (which values are uncertain) and for the
+efficiency analysis (price = input, everything else = output).
 """),
     show("PROMETHEE II – flows and complete ranking", "01_net_flows.png", "promethee_flows.csv"),
     interp("""
@@ -185,7 +195,7 @@ shown = "".join("".join(c["source"]) for c in cells)
 produced = [p.name for p in (ROOT / "results").glob("*.csv")] + \
            [p.name for p in (ROOT / "results" / "figures").glob("*.png")]
 # deliberately not shown (kept in results/ and REPORT.md, not needed in the notebook)
-HIDDEN = {"preference_index_matrix.csv", "ranking_comparison_scores.csv",
+HIDDEN = {"criteria_parameters.csv", "preference_index_matrix.csv", "ranking_comparison_scores.csv",
           "rank_acceptability_local20.csv", "rank_acceptability_local50.csv",
           "rank_acceptability_simplex.csv", "07_threshold_sweeps.png", "what_if.csv",
           "08_what_if.png", "budget_choice.csv", "10_budget_choice.png",

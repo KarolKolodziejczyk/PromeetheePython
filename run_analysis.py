@@ -110,6 +110,61 @@ def main(path: str):
     md += ["## 1. Input data\n", md_table(perf, "{:g}"), "",
            md_table(params, "{:g}"), ""]
 
+    # readable overview of every input per criterion (for presenting the model)
+    def _unit(name):
+        return name[name.find("[") + 1:name.find("]")] if "[" in name else ""
+
+    def _meaning(c, u):
+        u = f" {u}" if u and not u.startswith("1-") else ""
+        if c.function == "usual":
+            return "any difference = clearly better"
+        if c.function == "u-shape":
+            return f"≤ {c.q:g}{u}: no difference; more = clearly better"
+        if c.function == "v-shape":
+            return f"each unit counts; ≥ {c.p:g}{u} = clearly better"
+        if c.function == "level":
+            return (f"≤ {c.q:g}{u}: no difference; up to {c.p:g}{u}: half; "
+                    f"> {c.p:g}{u}: clearly better")
+        if c.function == "linear":
+            return (f"≤ {c.q:g}{u}: no difference; grows linearly; "
+                    f"≥ {c.p:g}{u}: clearly better")
+        return f"gaussian, s = {c.s:g}"
+
+    fz_spec = {s_["criterion"]: s_ for s_ in pb.config.get("fuzzy", {}).get("values", [])}
+    eff_cost = set(pb.config.get("efficiency", {}).get("cost_criteria", []))
+    w_m2 = pb.weight_scenarios.get("M2 rank sum")
+
+    def _tfn(c):
+        s_ = fz_spec.get(c.id)
+        if not s_:
+            return "exact"
+        u = _unit(c.name)
+        u = f" {u}" if u and not u.startswith("1-") else ""
+        txt = f"±{s_['relative']:.0%}" if "relative" in s_ else f"±{s_['absolute']:g}{u}"
+        for alt, v in s_.get("override", {}).items():
+            txt += f"; {pb.alt_names[A.index(alt)]}: ({v[0]:g}; {v[1]:g}; {v[2]:g})"
+        return txt
+
+    overview = pd.DataFrame({
+        "criterion": [c.name.split(" [")[0] for c in pb.criteria],
+        "unit": [_unit(c.name) for c in pb.criteria],
+        "better": ["lower" if c.direction == "min" else "higher" for c in pb.criteria],
+        "weight M1 (base)": pb.weights,
+        "weight M2": w_m2 if w_m2 is not None else np.nan,
+        "preference function": [c.function for c in pb.criteria],
+        "q": [f"{c.q:g}" if c.function in ("u-shape", "level", "linear") else "–"
+              for c in pb.criteria],
+        "p": [f"{c.p:g}" if c.function in ("v-shape", "level", "linear") else "–"
+              for c in pb.criteria],
+        "what the thresholds mean": [_meaning(c, _unit(c.name)) for c in pb.criteria],
+        "uncertainty (TFN)": [_tfn(c) for c in pb.criteria],
+        "efficiency role": ["input (cost)" if c.id in eff_cost else "output (benefit)"
+                            for c in pb.criteria],
+    }, index=C)
+    overview.index.name = "id"
+    overview.to_csv(OUT / "inputs_overview.csv")
+    md += ["### Inputs overview\n", md_table(overview, "{:g}"), ""]
+
     # ------------------------------------------------------- PROMETHEE I/II
     res = promethee(pb.X, pb.criteria, pb.weights)
     flows = pd.DataFrame({"phi+": res.phi_plus, "phi-": res.phi_minus,

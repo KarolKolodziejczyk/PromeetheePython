@@ -1,0 +1,7 @@
+id,criterion,unit,better,weight M1 (base),weight M2,preference function,q,p,what the thresholds mean,uncertainty (TFN),efficiency role
+C1,Price,EUR,lower,0.30000000000000004,0.2857142857142857,linear,50,300,≤ 50 EUR: no difference; grows linearly; ≥ 300 EUR: clearly better,±5%; Snapmaker U1: (899; 899; 1099),input (cost)
+C2,Noise,dB(A),lower,0.15000000000000002,0.19047619047619047,linear,2,7,≤ 2 dB(A): no difference; grows linearly; ≥ 7 dB(A): clearly better,±2 dB(A); Creality K2 Plus Combo: (45; 50; 52),output (benefit)
+C3,Max speed,mm/s,higher,0.10000000000000002,0.09523809523809523,linear,50,400,≤ 50 mm/s: no difference; grows linearly; ≥ 400 mm/s: clearly better,exact,output (benefit)
+C4,Build volume,dm3,higher,0.12000000000000001,0.14285714285714285,linear,2,20,≤ 2 dm3: no difference; grows linearly; ≥ 20 dm3: clearly better,exact,output (benefit)
+C5,Ease of use,1-5,higher,0.08000000000000002,0.047619047619047616,level,0.5,1.5,≤ 0.5: no difference; up to 1.5: half; > 1.5: clearly better,±0.5,output (benefit)
+C6,Nozzles,pcs,higher,0.25000000000000006,0.23809523809523808,v-shape,–,3,each unit counts; ≥ 3 pcs = clearly better,exact,output (benefit)
