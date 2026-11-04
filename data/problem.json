@@ -8,7 +8,7 @@
     "A4": "Prusa CORE One"
   },
   "criteria": [
-    {"id": "C1", "name": "Price [EUR]",         "direction": "min", "function": "linear",  "q": 50,  "p": 600},
+    {"id": "C1", "name": "Price [EUR]",         "direction": "min", "function": "linear",  "q": 50,  "p": 300},
     {"id": "C2", "name": "Noise [dB(A)]",       "direction": "min", "function": "linear",  "q": 2,   "p": 7},
     {"id": "C3", "name": "Max speed [mm/s]",    "direction": "max", "function": "linear",  "q": 50,  "p": 400},
     {"id": "C4", "name": "Build volume [dm3]",  "direction": "max", "function": "linear",  "q": 2,   "p": 20},

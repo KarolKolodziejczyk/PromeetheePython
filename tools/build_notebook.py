@@ -117,7 +117,7 @@ Dane z Task 1 + **moje wybory dla PROMETHEE** (funkcja preferencji i progi):
 
 | kryterium | funkcja | q | p | dlaczego |
 |---|---|---|---|---|
-| cena (min) | linear | 50 € | 600 € | do 50 € bez różnicy, 600 € taniej = zdecydowanie lepsza |
+| cena (min) | linear | 50 € | 300 € | cena jest dla mnie bardzo ważna: do 50 € bez różnicy, już 300 € taniej (~12% budżetu) = zdecydowanie lepsza |
 | hałas (min) | linear | 2 dB | 7 dB | w Task 1: różnice 1–3 dB nic nie znaczą (różne źródła) |
 | prędkość (max) | linear | 50 | 400 | małe różnice niezauważalne |
 | objętość (max) | linear | 2 | 20 | 20 dm³ to inna klasa drukarki |
@@ -145,13 +145,13 @@ cells += [
     note("""
 **Kluczowy wynik.** φ⁺ = jak bardzo drukarka przewyższa inne, φ⁻ = jak bardzo inne przewyższają ją,
 **φ = φ⁺ − φ⁻** → ranking PROMETHEE II: **U1 > K2 Plus > H2D > Prusa**.
-U1 ma wyraźną przewagę (φ = +0.204), K2 i H2D są blisko siebie.
+U1 ma dużą przewagę (φ = +0.295, jedyna dodatnia), K2 i H2D prawie remis (różnica 0.014).
 """),
     show("Aggregated preference indices π(a, b)", csv="preference_index_matrix.csv",
          note="π(a, b) = weighted degree to which row printer is preferred to column printer"),
     note("""
-Stąd biorą się przepływy. Np. **π(U1, H2D) = 0.467**: cena 0.30·1 (U1 tańsza o 1226 € > p) + dysze 0.25·(2/3).
-φ⁺(U1) = średnia z **wiersza** U1 = (0.420 + 0.467 + 0.451)/3 = 0.446;
+Stąd biorą się przepływy. Np. **π(U1, H2D) = 0.467**: cena 0.30·1 (U1 tańsza o 1226 € > p = 300 €) + dysze 0.25·(2/3).
+φ⁺(U1) = średnia z **wiersza** U1 = (0.576 + 0.467 + 0.569)/3 = 0.537;
 φ⁻(U1) = średnia z **kolumny** U1 = (0.224 + 0.338 + 0.164)/3 = 0.242.
 """),
     show("PROMETHEE I – partial ranking", "02_promethee_I.png", "promethee_I_relations.csv",
@@ -159,8 +159,8 @@ Stąd biorą się przepływy. Np. **π(U1, H2D) = 0.467**: cena 0.30·1 (U1 tań
     note("""
 PROMETHEE I patrzy na φ⁺ i φ⁻ **osobno**. Lepsza tylko gdy wyższe φ⁺ **i** niższe φ⁻.
 Gdy jedno mówi „lepsza”, a drugie „gorsza” → **R (nieporównywalne)**, na wykresie linie się krzyżują.
+**U1 jest lepsza od wszystkich trzech** (najwyższe φ⁺ i najniższe φ⁻), więc PROMETHEE I potwierdza wynik.
 H2D jest nieporównywalna z K2 i Prusą: świetna w wielu rzeczach, ale bardzo droga.
-U1 vs K2: R tylko przez różnicę φ⁻ = 0.001, w praktyce U1 ≥ K2.
 """),
     show("Unicriterion net flows (strengths / weaknesses)", "03_unicriterion_profiles.png",
          "unicriterion_net_flows.csv"),
@@ -175,24 +175,25 @@ U1 vs K2: R tylko przez różnicę φ⁻ = 0.001, w praktyce U1 ≥ K2.
 Górna część = PROMETHEE, dolna = WSM z Task 1, dla 7 zestawów wag.
 - M1 i M2 → U1 w obu metodach (wynik Task 1 potwierdzony)
 - równe wagi / cena mniej ważna → H2D (PROMETHEE), WSM często dalej U1
-- bez multi-colour / duże wydruki → K2 Plus
+- duże wydruki → K2 Plus; bez multi-colour → U1, ale prawie remis z K2
+- Prusa zawsze ostatnia
 """),
     show("Scores", csv="ranking_comparison_scores.csv",
          note="Net flow φ for PROMETHEE, Task 1 WSM score for P × W"),
     note("""
 **Różnica WSM vs PROMETHEE:** WSM sumuje znormalizowane wartości (każda różnica liczy się proporcjonalnie).
 PROMETHEE porównuje **pary** i używa progów: małe różnice (< q) pomija, duże (> p) „ucina” na 1.
-Dlatego tam, gdzie WSM ledwo widzi różnicę (0.800 vs 0.799), PROMETHEE może dać wyraźny wynik.
+Dlatego przy „price matters less” WSM dalej wybiera U1, a PROMETHEE już H2D.
 """),
     md("## 5. Sensitivity analysis"),
     show("5.1 Weight stability intervals", "05_weight_sweeps.png", "weight_stability_intervals.csv"),
     note("""
 Zmieniam wagę **jednego** kryterium (reszta proporcjonalnie). Niebieski pas = ranking się nie zmienia.
-U1 zostaje 1. dla wagi ceny ≥ 0.17 i wagi dysz ≥ 0.113, inne kryteria musiałyby mieć co najmniej 2× większą wagę.
+U1 zostaje 1. dla wagi ceny ≥ 0.148 i **dowolnej** wagi dysz; inne kryteria musiałyby mieć co najmniej 2.4× większą wagę.
 """),
     show("5.2 Monte-Carlo rank acceptability (±20 % / ±50 % / any weights)", "06_rank_acceptability.png"),
     note("""
-Losowe wagi: ±20% wokół moich → U1 1. w 100%; ±50% → 92%; zupełnie losowe → H2D 64%.
+Losowe wagi: ±20% wokół moich → U1 1. w 100%; ±50% → 97%; zupełnie losowe → H2D 62%.
 Czyli: **H2D to obiektywnie najmocniejsza drukarka, U1 wygrywa przez moje priorytety** (cena + dysze).
 """),
     code('for f in ["local20", "local50", "simplex"]:\n'
@@ -202,9 +203,9 @@ Czyli: **H2D to obiektywnie najmocniejsza drukarka, U1 wygrywa przez moje priory
     note("Progi q, p to moja subiektywna decyzja, więc sprawdzam: mnożę wszystkie ×0.25 … ×2 → **U1 zawsze 1.** Zmieniają się tylko miejsca 2–3."),
     show("5.4 What if the Bambu H2D goes on sale?", "08_what_if.png", "what_if.csv"),
     note("""
-Kontynuacja sekcji 6 z Task 1: H2D wygrywa, jeśli kosztuje **< ok. 1297 €**.
+Kontynuacja sekcji 6 z Task 1: H2D wygrywa, jeśli kosztuje **< ok. 1096 €** (~48% taniej).
 WSM w Task 1 mówił, że H2D nie wygrywa nawet przy cenie U1, więc tu PROMETHEE daje inny wniosek.
-Powyżej ~1880 € linia H2D jest płaska: różnica ceny > p = 600 €, więc preferencja i tak = 1.
+Powyżej ~1580 € linia H2D jest płaska: różnica ceny > p = 300 €, więc preferencja i tak = 1.
 """),
     md("## 6. Extension – FlowSort (PROMETHEE SORT)"),
     note("""

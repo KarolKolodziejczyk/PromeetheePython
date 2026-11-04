@@ -1,5 +1,5 @@
 id,criterion,direction,function,q,p,s,weight
-C1,Price [EUR],min,linear,50.0,600.0,0.0,0.30000000000000004
+C1,Price [EUR],min,linear,50.0,300.0,0.0,0.30000000000000004
 C2,Noise [dB(A)],min,linear,2.0,7.0,0.0,0.15000000000000002
 C3,Max speed [mm/s],max,linear,50.0,400.0,0.0,0.10000000000000002
 C4,Build volume [dm3],max,linear,2.0,20.0,0.0,0.12000000000000001

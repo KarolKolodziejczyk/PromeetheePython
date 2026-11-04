@@ -77,7 +77,7 @@ Funkcje działają na całych macierzach naraz (`np.where`, `np.clip`), bez
 pętli.
 
 **Nasze wybory:**
-* cena: liniowa, q = 50 €, p = 600 €;
+* cena: liniowa, q = 50 €, p = 300 € (cena jest bardzo ważna, już 300 € różnicy przesądza);
 * hałas: liniowa, q = 2 dB, p = 7 dB. q = 2 dB, bo w Task 1 napisałeś, że
   różnice 1–3 dB nic nie znaczą;
 * prędkość: liniowa, q = 50, p = 400;
@@ -143,7 +143,7 @@ to sprawdza.
 
 | Kryterium (waga) | różnica | P(U1, H2D) | P(H2D, U1) |
 |---|---|---|---|
-| Cena (0.30) | U1 tańsza o 1226 € > p = 600 | **1.000** | 0 |
+| Cena (0.30) | U1 tańsza o 1226 € > p = 300 | **1.000** | 0 |
 | Hałas (0.15) | H2D cichsza o 5.9 dB → (5.9 − 2)/(7 − 2) | 0 | **0.780** |
 | Prędkość (0.10) | H2D szybsza o 500 > p = 400 | 0 | **1.000** |
 | Objętość (0.12) | H2D większa o 14.1 → (14.1 − 2)/(20 − 2) | 0 | **0.673** |
@@ -157,15 +157,15 @@ Pełna macierz π (wiersz = a, kolumna = b):
 
 |  | K2 | U1 | H2D | Prusa |
 |---|---|---|---|---|
-| K2 | 0 | 0.224 | 0.347 | 0.145 |
-| U1 | 0.420 | 0 | 0.467 | 0.451 |
+| K2 | 0 | 0.224 | 0.347 | 0.174 |
+| U1 | 0.576 | 0 | 0.467 | 0.569 |
 | H2D | 0.263 | 0.338 | 0 | 0.336 |
 | Prusa | 0.040 | 0.164 | 0.300 | 0 |
 
 Dla U1:
-* φ⁺ = (0.420 + 0.467 + 0.451)/3 = **0.446** (suma wiersza U1),
+* φ⁺ = (0.576 + 0.467 + 0.569)/3 = **0.537** (suma wiersza U1),
 * φ⁻ = (0.224 + 0.338 + 0.164)/3 = **0.242** (suma kolumny U1),
-* φ = **+0.204**, czyli pierwsze miejsce.
+* φ = **+0.295**, czyli pierwsze miejsce.
 
 ### 2.7 `promethee_I` (linie 182–210) – ranking częściowy
 
@@ -175,8 +175,8 @@ Dla każdej pary (a, b) kod porównuje osobno φ⁺ i φ⁻:
   najmniej jedna nierówność jest ostra.
 * **I** (obojętność): oba przepływy są równe.
 * **−**: odwrotnie, b jest lepsze od a.
-* **R** (nieporównywalność): przepływy „się krzyżują”. Na przykład K2 i U1:
-  U1 ma dużo wyższe φ⁺, ale K2 ma o 0.001 niższe φ⁻.
+* **R** (nieporównywalność): przepływy „się krzyżują”. Na przykład H2D i K2:
+  H2D ma wyższe φ⁺ (0.313 vs 0.249), ale K2 ma niższe φ⁻ (0.293 vs 0.371).
 
 `tol = 1e-9` chroni przed błędami zaokrągleń liczb zmiennoprzecinkowych.
 
@@ -233,8 +233,8 @@ Wynik jest dokładny (analityczny), a nie przybliżony siatką.
 `test_stability_intervals_are_exact` sprawdza, że tuż wewnątrz przedziału
 ranking jest taki sam, a tuż za granicą już inny.
 
-Przykład: U1 pozostaje najlepsza dla wagi ceny w przedziale [0.170, 1].
-Poniżej 0.170 wygrywa H2D.
+Przykład: U1 pozostaje najlepsza dla wagi ceny w przedziale [0.148, 1].
+Poniżej 0.148 wygrywa H2D.
 
 ### 3.3 `weight_sweep` (linie 83–87)
 
@@ -309,7 +309,7 @@ jest przekroczona.
 
 Działa jak Monte Carlo z punktu 3.4, tylko zamiast pozycji w rankingu
 zliczamy klasy. Wynik: U1 jest „Very good” w 100 % losowań przy ±20 % i w
-94 % przy ±50 %.
+99.5 % przy ±50 %.
 
 ---
 
@@ -325,7 +325,7 @@ i fragment `results.md`.
 | `ranking comparison` | ranking PROMETHEE i WSM dla 7 zestawów wag, τ Kendalla, ρ Spearmana | `ranking_comparison_*.csv`, `04_…` |
 | `sensitivity: weights` | przedziały stabilności, wykresy wag, Monte Carlo | `weight_stability_intervals.csv`, `05_…`, `06_…` |
 | `sensitivity: thresholds` | skalowanie progów i wariant „usual” | `threshold_sensitivity.csv`, `07_…` |
-| `what-if` | cena H2D od 700 do 2500 € w 361 krokach; punkt zmiany zwycięzcy liczony interpolacją liniową (≈ 1297 €) | `what_if.csv`, `08_…` |
+| `what-if` | cena H2D od 700 do 2500 € w 361 krokach; punkt zmiany zwycięzcy liczony interpolacją liniową (≈ 1096 €) | `what_if.csv`, `08_…` |
 | `FlowSort` | klasy przy wagach bazowych i wszystkich scenariuszach, akceptowalność klas | `flowsort_*.csv`, `09_…`, `10_…` |
 
 Funkcje pomocnicze:
@@ -416,7 +416,7 @@ trzeba przeszukiwać siatki wartości.
   niezależną od liczby porównywanych drukarek. To odpowiada na słaby punkt z
   Task 1: tylko 4 drukarki.
 
-**Co oznacza 64 % dla H2D w Monte Carlo przy losowych wagach?**
+**Co oznacza 62 % dla H2D w Monte Carlo przy losowych wagach?**
 Gdyby wagi były zupełnie przypadkowe, H2D wygrywałaby najczęściej, bo
 obiektywnie jest najmocniejszą maszyną. U1 wygrywa dzięki moim priorytetom:
 cena i liczba dysz mają razem 55 % wagi.
