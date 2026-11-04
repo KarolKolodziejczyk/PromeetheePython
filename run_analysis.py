@@ -242,7 +242,8 @@ def main(path: str):
     fig, ax = plt.subplots(figsize=(7.2, 3.4))
     ax.grid(False)
     im = ax.imshow(res.phi_j, cmap=DIVERGING, vmin=-1, vmax=1, aspect="auto")
-    ax.set_xticks(range(m), [f"{c.id}\n{c.name}" for c in pb.criteria], fontsize=8)
+    xt = [c.id + "\n" + c.name.replace(" [", "\n[") for c in pb.criteria]
+    ax.set_xticks(range(m), xt, fontsize=8)
     ax.set_yticks(range(n), pb.labels)
     for i in range(n):
         for j in range(m):

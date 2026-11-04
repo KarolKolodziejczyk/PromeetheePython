@@ -39,14 +39,15 @@ def interp(text: str) -> dict:
 
 
 def show(title: str, fig: str | None = None, csv: str | None = None, note: str = "") -> dict:
-    lines = [f'display(Markdown("### {title}"))']
+    """Display cell; in Colab only its title is visible (code hidden as a form)."""
+    lines = [f"#@title {title}", f'display(Markdown("### {title}"))']
     if note:
         lines.append(f"display(Markdown({note!r}))")
     if csv:
-        lines.append(f'display(pd.read_csv("results/{csv}", index_col=0).round(3))')
+        lines.append(f'table("results/{csv}")')
     if fig:
         lines.append(f'display(Image("results/figures/{fig}", width=900))')
-    return code("\n".join(lines))
+    return code("\n".join(lines), hidden=True)
 
 
 cells = [
@@ -76,8 +77,16 @@ All inputs are in this one file (the code contains no numbers from Task 1):
 cells += [
     md("## 2. Run the analysis"),
     code("!python run_analysis.py > /dev/null && echo 'done – results in results/'"),
-    code("import pandas as pd\nfrom IPython.display import Markdown, Image, display\n"
-         "pd.set_option('display.width', 200)"),
+    code("#@title Display settings\n"
+         "import pandas as pd\nfrom IPython.display import Markdown, Image, display\n"
+         "pd.set_option('display.width', 200)\n"
+         "pd.set_option('display.max_colwidth', None)\n"
+         "pd.set_option('display.float_format', '{:g}'.format)\n\n"
+         "def table(path):\n"
+         "    df = pd.read_csv(path, index_col=0).round(3)\n"
+         "    num = df.select_dtypes('number').columns\n"
+         "    df[num] = df[num] + 0.0  # shows -0.000 as 0\n"
+         "    display(df)", hidden=True),
 
     md("## 3. PROMETHEE I and II"),
     show("Performance table (from Task 1)", csv="performance_table.csv"),
@@ -108,8 +117,7 @@ U1 is better than all three others in this sense, so PROMETHEE I agrees with PRO
 winner. H2D is incomparable (R) with K2 Plus and with the Prusa: it is very good in speed, ease of
 use and noise, but much more expensive, so φ⁺ and φ⁻ say different things (the lines cross).
 """),
-    show("Strengths and weaknesses (unicriterion net flows)", "03_unicriterion_profiles.png",
-         "unicriterion_net_flows.csv"),
+    show("Strengths and weaknesses (unicriterion net flows)", "03_unicriterion_profiles.png"),
     interp("""
 This shows why U1 wins: it is the best on price and on nozzles, which are my two most important
 criteria (together 55 % of the weight). It is the loudest and slowest printer and has a small
@@ -118,8 +126,8 @@ the worst price.
 """),
 
     md("## 4. Comparison with the WSM from Task 1"),
-    show("Ranks of PROMETHEE II and WSM for different weights", "04_ranking_comparison.png",
-         "ranking_comparison_ranks.csv"),
+    show("Ranks of PROMETHEE II and WSM for different weights (1 = best)",
+         "04_ranking_comparison.png"),
     interp("""
 With my real weights (method 1 and method 2) both PROMETHEE and the WSM choose **U1**, so the
 result of Task 1 is confirmed. The methods differ in the details: with method 1 the WSM has H2D in
@@ -195,7 +203,7 @@ shown = "".join("".join(c["source"]) for c in cells)
 produced = [p.name for p in (ROOT / "results").glob("*.csv")] + \
            [p.name for p in (ROOT / "results" / "figures").glob("*.png")]
 # deliberately not shown (kept in results/ and REPORT.md, not needed in the notebook)
-HIDDEN = {"criteria_parameters.csv", "preference_index_matrix.csv", "ranking_comparison_scores.csv",
+HIDDEN = {"criteria_parameters.csv", "ranking_comparison_ranks.csv", "unicriterion_net_flows.csv", "preference_index_matrix.csv", "ranking_comparison_scores.csv",
           "rank_acceptability_local20.csv", "rank_acceptability_local50.csv",
           "rank_acceptability_simplex.csv", "07_threshold_sweeps.png", "what_if.csv",
           "08_what_if.png", "budget_choice.csv", "10_budget_choice.png",
