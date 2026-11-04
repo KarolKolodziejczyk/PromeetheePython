@@ -8,8 +8,9 @@ both weighting methods are copied unchanged from the Task 1 spreadsheet.
 **Tool choice.** I used my own Python code (`promethee/`, numpy only) and did
 not use Visual PROMETHEE. In line with the task rules, nothing from this code
 was put into VP, and no VP-specific output (e.g. the GAIA plane) was recreated.
-Because VP is not used, the sensitivity analysis is extended (Section 5), and
-the chosen extension is **SORT (FlowSort)** (Section 6).
+Because VP is not used, the sensitivity analysis is extended (Section 5:
+exact stability intervals, a stochastic Monte-Carlo analysis and a fuzzy-set
+analysis), and the chosen extension is **SORT (FlowSort)** (Section 6).
 
 All tables come from [`results/results.md`](results/results.md) and
 `results/*.csv`. To regenerate everything, run `python run_analysis.py`.
@@ -241,7 +242,62 @@ printers swap places can be computed exactly.
   price threshold p from 50 to 900 € gives exactly the same ranking. With any
   nozzle threshold p, U1 stays first.
 
-### 5.4 What if the Bambu H2D goes on sale? (continues Task 1, Section 6)
+### 5.4 Fuzzy-set stability (triangular fuzzy weights)
+
+Section 5.2 treats the uncertain weights **stochastically** (random samples).
+Here the same uncertainty is modelled with **fuzzy sets**. I cannot say that
+the price weight is exactly 0.30, only that it is "about 0.30". Each weight w
+therefore becomes a triangular fuzzy number (w·(1−s), w, w·(1+s)). For the
+price weight and s = 20 % this is (0.24, 0.30, 0.36).
+
+**How it is computed**
+* An **α-cut** of a fuzzy weight is the interval of values that are plausible
+  at least to degree α:
+  * at α = 1 only the crisp weight remains,
+  * at α = 0 the whole range [w(1−s), w(1+s)] is allowed.
+* For every α, I take **all** weight vectors whose weights lie in their
+  α-cuts and sum to 1, and compute the smallest and the largest possible net
+  flow of every printer. This gives a **fuzzy net flow**: for each α an
+  interval of φ.
+* Because φ = Σⱼ wⱼ φⱼ is linear in the weights, these minima and maxima are
+  computed exactly, not by sampling.
+* To check who wins, I compute the smallest possible value of
+  φ(U1) − φ(b) for each other printer b, using the *same* weight vector for
+  both printers. If it is positive, U1 beats b for every plausible weight
+  vector at that α.
+
+![fuzzy stability](results/figures/11_fuzzy_stability.png)
+
+| Printer | φ at α = 1 | φ range at α = 0, ±20 % | φ range at α = 0, ±50 % |
+|---|---|---|---|
+| A2 Snapmaker U1 | +0.295 | [+0.165, +0.425] | [−0.031, +0.620] |
+| A1 Creality K2 Plus | −0.044 | [−0.111, +0.022] | [−0.210, +0.121] |
+| A3 Bambu Lab H2D | −0.059 | [−0.167, +0.049] | [−0.329, +0.212] |
+| A4 Prusa CORE One | −0.192 | [−0.243, −0.140] | [−0.321, −0.062] |
+
+* **±20 % fuzzy weights: U1 is the best printer for every plausible weight
+  vector, at every α.** Even at α = 0, its worst case (+0.165) is above the
+  best case of every other printer.
+* **±50 % fuzzy weights:** at α = 0 the intervals overlap. K2 Plus or H2D
+  could beat U1 for some extreme weight combinations. From **α ≈ 0.41**
+  upward, U1 is guaranteed to be best.
+* **Largest guaranteed spread:** U1 stays best for every weight vector in
+  which each weight deviates by up to **±29.7 %** from my base value.
+* The defuzzified net flows (the average of the α-cut midpoints) equal the
+  crisp ones, because the fuzzy weights are symmetric. The fuzzy analysis
+  does not change the ranking. It shows **how much uncertainty the ranking
+  can tolerate**.
+
+**Stochastic vs. fuzzy.** Both approaches describe the same uncertainty
+about the weights:
+* the Monte-Carlo analysis answers **"how often does U1 win?"**
+  (97 % for ±50 %);
+* the fuzzy analysis answers **"up to which uncertainty is U1 *guaranteed*
+  to win?"** (±29.7 %, or α ≥ 0.41 for ±50 %).
+
+Both lead to the same conclusion: U1 is a robust winner.
+
+### 5.5 What if the Bambu H2D goes on sale? (continues Task 1, Section 6)
 
 ![what-if](results/figures/08_what_if.png)
 
@@ -344,6 +400,8 @@ checked; when they differ, the printer belongs to an interval of classes.
    * It is the only printer sorted as "Very good".
    * It stays first for ±20 % weight uncertainty (100 %), ±50 % (97 %), and
      every threshold variant.
+   * The fuzzy-set analysis guarantees that it is best for every weight
+     vector within ±29.7 % of my weights.
 
    **My Task 1 guess and the WSM result are confirmed by PROMETHEE.**
 2. **Why U1 wins:** my two most important criteria, price (0.30) and nozzles

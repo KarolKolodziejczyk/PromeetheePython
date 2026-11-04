@@ -20,7 +20,7 @@ BRANCH = "claude/wizardly-edison-vn4pzz"
 NB = "PROMETHEE_Colab.ipynb"
 
 EMBED = ["promethee/__init__.py", "promethee/core.py", "promethee/sensitivity.py",
-         "promethee/sort.py", "run_analysis.py", "data/problem.json"]
+         "promethee/sort.py", "promethee/fuzzy.py", "run_analysis.py", "data/problem.json"]
 
 
 def md(text: str) -> dict:
@@ -96,6 +96,12 @@ Wrażliwość. Trik: **φ = Σ w_j·φ_j** (φ jest liniowe w wagach), więc:
     "promethee/sort.py": """
 FlowSort: każdą drukarkę porównuję **z profilami granicznymi** (nie z innymi drukarkami),
 liczę zwykłe PROMETHEE na zbiorze {profile + ta drukarka} i patrzę, między którymi profilami wypada jej φ → klasa.
+""",
+    "promethee/fuzzy.py": """
+Stabilność przez **zbiory rozmyte (fuzzy sets)**: każda waga to liczba trójkątna (w·(1−s), w, w·(1+s)).
+Dla każdego poziomu α liczę **najmniejsze i największe φ** po wszystkich wagach z α-przekroju (suma = 1).
+`extreme_linear`: dokładne min/max (φ jest liniowe w wagach → wystarczy „dosypywać” wagę zachłannie).
+`robust_spread`: jak duży rozrzut wag U1 wytrzymuje i nadal na pewno wygrywa.
 """,
     "run_analysis.py": """
 Skrypt „dyrygent”: wczytuje JSON, woła funkcje z `promethee/` sekcja po sekcji
@@ -201,7 +207,18 @@ Czyli: **H2D to obiektywnie najmocniejsza drukarka, U1 wygrywa przez moje priory
          '    display(pd.read_csv(f"results/rank_acceptability_{f}.csv", index_col=0).round(3))'),
     show("5.3 Thresholds and preference functions", "07_threshold_sweeps.png", "threshold_sensitivity.csv"),
     note("Progi q, p to moja subiektywna decyzja, więc sprawdzam: mnożę wszystkie ×0.25 … ×2 → **U1 zawsze 1.** Zmieniają się tylko miejsca 2–3."),
-    show("5.4 What if the Bambu H2D goes on sale?", "08_what_if.png", "what_if.csv"),
+    show("5.4 Fuzzy-set stability (triangular fuzzy weights)", "11_fuzzy_stability.png",
+         "fuzzy_stability.csv"),
+    note("""
+**Fuzzy zamiast losowania:** waga ceny to nie „dokładnie 0.30”, tylko „około 0.30” = trójkąt (0.24; 0.30; 0.36) przy ±20%.
+- **α = 1** (czubek trójkąta) = moje dokładne wagi → zwykłe φ
+- **α = 0** (podstawa) = najszerszy zakres wag → φ jako przedział
+- szerokość „trójkąta” φ na wysokości α = ile może się zmienić φ, gdy wagi są niepewne
+
+Wynik: przy ±20% **U1 wygrywa dla każdej wagi** w całym zakresie. Przy ±50% pewna wygrana dopiero od α ≈ 0.41.
+Największy rozrzut, przy którym U1 wygrywa na pewno: **±29.7%** każdej wagi.
+"""),
+    show("5.5 What if the Bambu H2D goes on sale?", "08_what_if.png", "what_if.csv"),
     note("""
 Kontynuacja sekcji 6 z Task 1: H2D wygrywa, jeśli kosztuje **< ok. 1096 €** (~48% taniej).
 WSM w Task 1 mówił, że H2D nie wygrywa nawet przy cenie U1, więc tu PROMETHEE daje inny wniosek.

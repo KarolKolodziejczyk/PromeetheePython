@@ -270,6 +270,36 @@ miejscu r + 1. Dla U1 przy ±20 % wynosi 100 % na 1. miejscu.
 Tutaj trzeba liczyć PROMETHEE od nowa, bo zmiana progów zmienia macierze P.
 `copy.deepcopy` zapewnia, że oryginalne kryteria zostają nienaruszone.
 
+### 3.6 `promethee/fuzzy.py` – stabilność przez zbiory rozmyte (fuzzy sets)
+
+Monte Carlo (3.4) opisuje niepewność wag **losowo**. Tutaj ta sama niepewność
+jest opisana **zbiorami rozmytymi**.
+
+* `triangular_weights`: każda waga w staje się liczbą trójkątną
+  (w·(1−s), w, w·(1+s)). Na przykład dla ceny i s = 20 % to (0.24; 0.30; 0.36),
+  czyli „około 0.30”.
+* `alpha_cut`: **α-przekrój**, czyli przedział wag wiarygodnych co najmniej w
+  stopniu α. Przy α = 1 zostaje tylko moja dokładna waga; przy α = 0 cały
+  zakres trójkąta.
+* `extreme_linear`: dla danego α szuka **najmniejszego i największego φ** po
+  wszystkich wagach z przekrojów, których suma wynosi 1. Ponieważ
+  φ = Σ wⱼ φⱼ jest liniowe w wagach, wystarczy rozwiązanie zachłanne: zacznij
+  od dolnych granic i „dosypuj” resztę wagi najpierw tam, gdzie φⱼ jest
+  najwyższe (dla max) albo najniższe (dla min). Wynik jest dokładny.
+* `fuzzy_flows`: robi to dla każdego α i każdej drukarki. Wynikiem jest
+  **rozmyty przepływ netto** (wykres `11_fuzzy_stability.png`, trójkąty).
+* `guaranteed_margin`: najmniejsza możliwa różnica φ(U1) − φ(b), liczona przy
+  *tych samych* wagach dla obu drukarek. Jeśli jest > 0, U1 wygrywa z b dla
+  każdych wag z przekroju.
+* `guaranteed_alpha`: od jakiego α wygrana U1 jest pewna. Dla ±50 % to α ≈ 0.41.
+* `robust_spread`: największy rozrzut s, przy którym U1 na pewno wygrywa w
+  całym trójkącie. Wynik: **±29.7 %**. Szukane bisekcją.
+
+Testy:
+* przy α = 1 wynik równa się zwykłemu φ;
+* losowe wagi z trójkąta nigdy nie wychodzą poza policzone przedziały;
+* algorytm zachłanny daje poprawny wynik na małym przykładzie.
+
 ---
 
 ## 4. `promethee/sort.py` – rozszerzenie FlowSort
@@ -415,6 +445,15 @@ trzeba przeszukiwać siatki wartości.
 * FlowSort daje ocenę bezwzględną („czy ta drukarka jest naprawdę dobra?”),
   niezależną od liczby porównywanych drukarek. To odpowiada na słaby punkt z
   Task 1: tylko 4 drukarki.
+
+**Stochastycznie czy fuzzy?**
+Zrobiłem oba podejścia:
+* Monte Carlo (stochastyczne) odpowiada na pytanie „jak często U1 wygrywa?”:
+  97 % przy ±50 %.
+* Fuzzy odpowiada na pytanie „do jakiej niepewności wygrana U1 jest pewna?”:
+  ±29.7 % każdej wagi.
+
+Oba prowadzą do tego samego wniosku: U1 to stabilny zwycięzca.
 
 **Co oznacza 62 % dla H2D w Monte Carlo przy losowych wagach?**
 Gdyby wagi były zupełnie przypadkowe, H2D wygrywałaby najczęściej, bo

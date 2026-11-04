@@ -21,6 +21,8 @@ from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 from promethee import (Problem, kendall_tau, promethee, promethee_I,  # noqa: E402
                        ranks_from_scores, spearman_rho, weighted_sum)
 from promethee.sort import class_acceptability, flowsort  # noqa: E402
+from promethee.fuzzy import (defuzzify, fuzzy_flows, guaranteed_alpha,  # noqa: E402
+                             guaranteed_margin, robust_spread)
 from promethee.sensitivity import (monte_carlo, single_threshold_sweep,  # noqa: E402
                                    stability_intervals, threshold_sensitivity,
                                    weight_sweep)
@@ -58,7 +60,7 @@ def md_table(df: pd.DataFrame, floatfmt: str = "{:.4f}") -> str:
             if pd.api.types.is_integer_dtype(df[col].dtype):
                 cells.append(str(int(v)))
             elif isinstance(v, (float, np.floating)):
-                cells.append(floatfmt.format(v))
+                cells.append("–" if np.isnan(v) else floatfmt.format(v))
             else:
                 cells.append(str(v))
         lines.append("| " + " | ".join(cells) + " |")
@@ -383,6 +385,61 @@ def main(path: str):
         fig.tight_layout()
         save(fig, "07_threshold_sweeps.png")
 
+    # ------------------------------------- sensitivity: fuzzy-set weights
+    best = int(np.argmax(res.phi))
+    alphas = np.linspace(0, 1, 101)
+    fz_rows, fz_flows = [], {}
+    for spread in (0.2, 0.5):
+        lo, hi = fuzzy_flows(res.phi_j, pb.weights, spread, alphas)
+        fz_flows[spread] = (lo, hi)
+        marg = guaranteed_margin(res.phi_j, pb.weights, spread, [0.0, 0.5, 1.0], best)
+        a_star = guaranteed_alpha(res.phi_j, pb.weights, spread, best)
+        for i in range(n):
+            fz_rows.append({
+                "spread": f"±{spread:.0%}", "alternative": pb.labels[i],
+                "φ α=0 (min)": lo[0, i], "φ α=0 (max)": hi[0, i],
+                "φ α=0.5 (min)": lo[50, i], "φ α=0.5 (max)": hi[50, i],
+                "φ α=1": lo[-1, i], "defuzzified φ": defuzzify(lo, hi)[i],
+                f"min φ({A[best]}) − φ(·) α=0": marg[0, i] if i != best else np.nan,
+                f"min φ({A[best]}) − φ(·) α=0.5": marg[1, i] if i != best else np.nan,
+                f"{A[best]} guaranteed best from α": a_star,
+            })
+    fz_df = pd.DataFrame(fz_rows).set_index(["spread", "alternative"])
+    fz_df.to_csv(OUT / "fuzzy_stability.csv")
+    rs = robust_spread(res.phi_j, pb.weights, best)
+    md += ["### 5.4 Fuzzy-set stability (triangular fuzzy weights)\n",
+           "Every weight w is replaced by the triangular fuzzy number "
+           "(w·(1−s), w, w·(1+s)). For each α-cut the min / max net flow over all "
+           "weight vectors inside the cuts (summing to 1) is computed exactly.\n",
+           md_table(fz_df.reset_index().set_index("alternative"), "{:+.3f}"), "",
+           f"{pb.labels[best]} is the best printer for **every** weight vector "
+           f"within ±{rs:.1%} of each base weight (largest guaranteed spread).\n"]
+
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 3.8), sharey=True)
+    for ax, spread in zip(axes, (0.2, 0.5)):
+        lo, hi = fz_flows[spread]
+        for i, a in enumerate(A):
+            xs = np.concatenate([lo[:, i], hi[::-1, i]])
+            ys = np.concatenate([alphas, alphas[::-1]])
+            ax.fill(xs, ys, color=color[a], alpha=0.12, lw=0)
+            ax.plot(xs, ys, color=color[a], label=pb.labels[i])
+        a_star = guaranteed_alpha(res.phi_j, pb.weights, spread, best)
+        if 0 < a_star < 1:
+            ax.axhline(a_star, color=INK, lw=1, ls=":")
+            ax.text(ax.get_xlim()[0], a_star + 0.02, f" from α = {a_star:.2f}: "
+                    f"{pb.alt_names[best]} best for all weights", fontsize=8, color=INK)
+        elif a_star == 0:
+            ax.text(ax.get_xlim()[0], 0.03, f" {pb.alt_names[best]} best for all weights in the "
+                    "whole support", fontsize=8, color=INK)
+        ax.set_xlabel("fuzzy net flow φ")
+        ax.set_title(f"fuzzy weights ±{spread:.0%}", loc="left", fontsize=10)
+    axes[0].set_ylabel("membership α")
+    axes[1].legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1))
+    fig.suptitle("Fuzzy net flows: width at height α = range of φ for weights in "
+                 "the α-cut", x=0.01, ha="left", fontweight="bold")
+    fig.tight_layout()
+    save(fig, "11_fuzzy_stability.png")
+
     # --------------------------------------------- what-if: one performance
     wi = pb.config.get("what_if")
     if wi:
@@ -417,7 +474,7 @@ def main(path: str):
                         f"rank of {A[ai]}": int(rr.ranks()[ai])})
         wi_df = pd.DataFrame(tab).set_index("value")
         wi_df.to_csv(OUT / "what_if.csv")
-        md += [f"### 5.4 What-if: {wi.get('description', '')}\n",
+        md += [f"### 5.5 What-if: {wi.get('description', '')}\n",
                f"Varying `{cnames[cj]}` of {pb.labels[ai]} (current value {cur:g}), "
                "base weights.\n", md_table(wi_df, "{:+.3f}"), "",
                "Winner changes at: " + (", ".join(f"{x:.0f}" for x in switch)

@@ -198,7 +198,24 @@ Other weights keep their proportions. `best` = A2 Snapmaker U1.
 | thresholds x2 | 2 | 1 | 4 | 3 | 0.667 | A2 |
 | all 'usual' (type I) | 3 | 1 | 2 | 4 | 0.667 | A2 |
 
-### 5.4 What-if: What if the Bambu Lab H2D goes on sale? (Task 1, section 6)
+### 5.4 Fuzzy-set stability (triangular fuzzy weights)
+
+Every weight w is replaced by the triangular fuzzy number (w·(1−s), w, w·(1+s)). For each α-cut the min / max net flow over all weight vectors inside the cuts (summing to 1) is computed exactly.
+
+| alternative | spread | φ α=0 (min) | φ α=0 (max) | φ α=0.5 (min) | φ α=0.5 (max) | φ α=1 | defuzzified φ | min φ(A2) − φ(·) α=0 | min φ(A2) − φ(·) α=0.5 | A2 guaranteed best from α |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A1 Creality K2 Plus Combo | ±20% | -0.111 | +0.022 | -0.078 | -0.011 | -0.044 | -0.044 | +0.183 | +0.261 | +0.000 |
+| A2 Snapmaker U1 | ±20% | +0.165 | +0.425 | +0.230 | +0.360 | +0.295 | +0.295 | – | – | +0.000 |
+| A3 Bambu Lab H2D | ±20% | -0.167 | +0.049 | -0.113 | -0.005 | -0.059 | -0.059 | +0.115 | +0.235 | +0.000 |
+| A4 Prusa CORE One | ±20% | -0.243 | -0.140 | -0.218 | -0.166 | -0.192 | -0.192 | +0.346 | +0.416 | +0.000 |
+| A1 Creality K2 Plus Combo | ±50% | -0.210 | +0.121 | -0.127 | +0.038 | -0.044 | -0.044 | -0.051 | +0.144 | +0.407 |
+| A2 Snapmaker U1 | ±50% | -0.031 | +0.620 | +0.132 | +0.458 | +0.295 | +0.295 | – | – | +0.407 |
+| A3 Bambu Lab H2D | ±50% | -0.329 | +0.212 | -0.194 | +0.077 | -0.059 | -0.059 | -0.242 | +0.056 | +0.407 |
+| A4 Prusa CORE One | ±50% | -0.321 | -0.062 | -0.256 | -0.127 | -0.192 | -0.192 | +0.136 | +0.311 | +0.407 |
+
+A2 Snapmaker U1 is the best printer for **every** weight vector within ±29.7% of each base weight (largest guaranteed spread).
+
+### 5.5 What-if: What if the Bambu Lab H2D goes on sale? (Task 1, section 6)
 
 Varying `Price [EUR]` of A3 Bambu Lab H2D (current value 2125), base weights.
 

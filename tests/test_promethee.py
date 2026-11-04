@@ -6,6 +6,7 @@ from promethee.core import PREFERENCE_FUNCTIONS
 from promethee.sensitivity import phi_with_weight, stability_intervals, monte_carlo
 from promethee.core import weighted_sum
 from promethee.sort import flowsort
+from promethee.fuzzy import extreme_linear, fuzzy_flows, robust_spread, triangular_weights
 
 
 def test_preference_functions_shapes():
@@ -90,3 +91,36 @@ def test_flowsort_extremes():
 def test_kendall_tau():
     assert kendall_tau([1, 2, 3], [1, 2, 3]) == 1
     assert kendall_tau([1, 2, 3], [3, 2, 1]) == -1
+
+
+def test_fuzzy_alpha1_is_crisp_and_bounds_contain_samples():
+    p = Problem.from_json("data/problem.json")
+    r = promethee(p.X, p.criteria, p.weights)
+    lo, hi = fuzzy_flows(r.phi_j, p.weights, 0.5, [0.0, 1.0])
+    np.testing.assert_allclose(lo[1], r.phi, atol=1e-12)
+    np.testing.assert_allclose(hi[1], r.phi, atol=1e-12)
+    # random weight vectors inside the support never leave [lo, hi]
+    rng = np.random.default_rng(1)
+    l, m, u = triangular_weights(p.weights, 0.5)
+    W = rng.uniform(l, u, size=(50000, len(m)))
+    W /= W.sum(axis=1, keepdims=True)
+    W = W[np.all((W >= l - 1e-12) & (W <= u + 1e-12), axis=1)]
+    PHI = W @ r.phi_j.T
+    assert np.all(PHI.min(axis=0) >= lo[0] - 1e-9)
+    assert np.all(PHI.max(axis=0) <= hi[0] + 1e-9)
+
+
+def test_extreme_linear_greedy():
+    c = np.array([3.0, 1.0, 2.0])
+    lo, hi = np.array([0.1, 0.1, 0.1]), np.array([0.5, 0.9, 0.5])
+    # max: fill c=3 up to 0.5, then c=2 up to 0.4 -> 0.5*3 + 0.1*1 + 0.4*2
+    assert extreme_linear(c, lo, hi, True) == pytest.approx(1.5 + 0.1 + 0.8)
+    # min: fill c=1 first up to 0.8 -> 0.1*3 + 0.8*1 + 0.1*2
+    assert extreme_linear(c, lo, hi, False) == pytest.approx(0.3 + 0.8 + 0.2)
+
+
+def test_robust_spread_is_tight():
+    p = Problem.from_json("data/problem.json")
+    r = promethee(p.X, p.criteria, p.weights)
+    s = robust_spread(r.phi_j, p.weights, 1)
+    assert 0 < s < 1

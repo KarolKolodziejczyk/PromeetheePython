@@ -24,6 +24,7 @@ After changing the code, regenerate the notebook with `python tools/build_notebo
 | `data/problem.json` | the whole problem: printers, criteria (direction, preference function, q/p/s), performance table, weights, weight scenarios, what-if setup, FlowSort profiles |
 | `promethee/core.py` | 6 preference functions, PROMETHEE I & II, WSM (P×W, Task 1 ratio normalisation), Kendall τ / Spearman ρ |
 | `promethee/sensitivity.py` | exact weight-stability intervals, one-at-a-time sweeps, Monte-Carlo rank acceptability, threshold sensitivity |
+| `promethee/fuzzy.py` | fuzzy-set stability: triangular fuzzy weights, α-cuts, guaranteed winner |
 | `promethee/sort.py` | FlowSort assignment (φ, φ+, φ−) and class acceptability under random weights |
 | `run_analysis.py` | runs everything → `results/*.csv`, `results/figures/*.png`, `results/results.md` |
 | `tests/` | hand-computed example and consistency checks |
