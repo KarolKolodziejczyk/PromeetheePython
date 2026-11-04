@@ -5,8 +5,9 @@ from promethee import Criterion, Problem, promethee, promethee_I, kendall_tau
 from promethee.core import PREFERENCE_FUNCTIONS
 from promethee.sensitivity import phi_with_weight, stability_intervals, monte_carlo
 from promethee.core import weighted_sum
-from promethee.efficiency import efficient_set, promethee_v, split_flows
-from promethee.fuzzy import extreme_linear, fuzzy_flows, robust_spread, triangular_weights
+from promethee.efficiency import best_within_budget, efficient_set, split_flows
+from promethee.fuzzy import (extreme_linear, fuzzy_matrix, fuzzy_net_flows, guaranteed_margin,
+                             triangular_weights)
 
 
 def test_preference_functions_shapes():
@@ -77,7 +78,7 @@ def test_wsm_reproduces_task1_spreadsheet():
     np.testing.assert_allclose(s, [0.66171, 0.85000, 0.67316, 0.58844], atol=1e-4)
 
 
-def test_efficiency_and_promethee_v():
+def test_efficiency_and_best_within_budget():
     p = Problem.from_json("data/problem.json")
     r = promethee(p.X, p.criteria, p.weights)
     ben, cost = split_flows(r.phi_j, p.weights, [0])
@@ -88,9 +89,9 @@ def test_efficiency_and_promethee_v():
     assert eff[int(np.argmin(p.X[:, 0]))]          # the cheapest is always efficient
     assert eff[int(np.argmax(ben))]                # the best-benefit one too
     # PROMETHEE V with a budget below every price selects nothing
-    assert promethee_v(ben, p.X[:, 0], 100)[0] == ()
+    assert best_within_budget(ben, p.X[:, 0], 100)[0] == ()
     # with an unlimited budget it selects the highest benefit flow
-    assert promethee_v(ben, p.X[:, 0], 1e9)[0] == (int(np.argmax(ben)),)
+    assert best_within_budget(ben, p.X[:, 0], 1e9)[0] == (int(np.argmax(ben)),)
 
 
 def test_kendall_tau():
@@ -98,21 +99,38 @@ def test_kendall_tau():
     assert kendall_tau([1, 2, 3], [3, 2, 1]) == -1
 
 
-def test_fuzzy_alpha1_is_crisp_and_bounds_contain_samples():
+def _fuzzy_problem():
     p = Problem.from_json("data/problem.json")
-    r = promethee(p.X, p.criteria, p.weights)
-    lo, hi = fuzzy_flows(r.phi_j, p.weights, 0.5, [0.0, 1.0])
-    np.testing.assert_allclose(lo[1], r.phi, atol=1e-12)
-    np.testing.assert_allclose(hi[1], r.phi, atol=1e-12)
-    # random weight vectors inside the support never leave [lo, hi]
-    rng = np.random.default_rng(1)
-    l, m, u = triangular_weights(p.weights, 0.5)
-    W = rng.uniform(l, u, size=(50000, len(m)))
-    W /= W.sum(axis=1, keepdims=True)
-    W = W[np.all((W >= l - 1e-12) & (W <= u + 1e-12), axis=1)]
-    PHI = W @ r.phi_j.T
-    assert np.all(PHI.min(axis=0) >= lo[0] - 1e-9)
-    assert np.all(PHI.max(axis=0) <= hi[0] + 1e-9)
+    L, M, U = fuzzy_matrix(p.X, p.criteria, p.alt_ids, p.config["fuzzy"]["values"])
+    return p, L, M, U
+
+
+def test_f_promethee_alpha1_is_crisp():
+    p, L, M, U = _fuzzy_problem()
+    lo, hi = fuzzy_net_flows(L, M, U, p.criteria, p.weights, 0.2, [1.0])
+    crisp = promethee(p.X, p.criteria, p.weights).phi
+    np.testing.assert_allclose(lo[0], crisp, atol=1e-12)
+    np.testing.assert_allclose(hi[0], crisp, atol=1e-12)
+
+
+def test_f_promethee_bounds_contain_random_scenarios():
+    """Random matrices and weights inside the supports never leave the computed bounds."""
+    p, L, M, U = _fuzzy_problem()
+    spread = 0.2
+    lo, hi = fuzzy_net_flows(L, M, U, p.criteria, p.weights, spread, [0.0])
+    m_best = min(guaranteed_margin(L, M, U, p.criteria, p.weights, spread, 0.0, 1, b)
+                 for b in (0, 2, 3))
+    rng = np.random.default_rng(5)
+    wl, wm, wu = triangular_weights(p.weights, spread)
+    for _ in range(3000):
+        X = rng.uniform(L, U)
+        w = rng.uniform(wl, wu)
+        w = w / w.sum()
+        if np.any(w < wl - 1e-12) or np.any(w > wu + 1e-12):
+            continue
+        phi = promethee(X, p.criteria, w).phi
+        assert np.all(phi >= lo[0] - 1e-9) and np.all(phi <= hi[0] + 1e-9)
+        assert min(phi[1] - phi[b] for b in (0, 2, 3)) >= m_best - 1e-6
 
 
 def test_extreme_linear_greedy():
@@ -122,10 +140,3 @@ def test_extreme_linear_greedy():
     assert extreme_linear(c, lo, hi, True) == pytest.approx(1.5 + 0.1 + 0.8)
     # min: fill c=1 first up to 0.8 -> 0.1*3 + 0.8*1 + 0.1*2
     assert extreme_linear(c, lo, hi, False) == pytest.approx(0.3 + 0.8 + 0.2)
-
-
-def test_robust_spread_is_tight():
-    p = Problem.from_json("data/problem.json")
-    r = promethee(p.X, p.criteria, p.weights)
-    s = robust_spread(r.phi_j, p.weights, 1)
-    assert 0 < s < 1

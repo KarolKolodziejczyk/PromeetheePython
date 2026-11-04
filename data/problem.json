@@ -1,6 +1,6 @@
 {
   "title": "Which 3D printer should I buy? (FDM printer for home, budget max 2500 EUR)",
-  "source": "Task 1 spreadsheet KK_MCDM_1.xlsx (data checked 22.10.2026)",
+  "source": "Task 1 spreadsheet KK_MCDM_1.xlsx",
   "alternatives": {
     "A1": "Creality K2 Plus Combo",
     "A2": "Snapmaker U1",
@@ -39,8 +39,20 @@
     "values_from": 700,
     "values_to": 2500
   },
+  "fuzzy": {
+    "description": "F-PROMETHEE: uncertain values of the decision matrix are triangular fuzzy numbers (low, value used, high); optionally the weights are fuzzy too.",
+    "weight_spread": 0.2,
+    "values": [
+      {"criterion": "C1", "relative": 0.05, "override": {"A2": [899, 899, 1099]},
+       "why": "prices change from shop to shop (±5 %); the U1 price of 899 EUR is a sale price, normally 1099 EUR"},
+      {"criterion": "C2", "absolute": 2, "override": {"A1": [45, 50, 52]},
+       "why": "noise values come from different sources (±2 dB); for the K2 Plus the manufacturer states 45 dB, the shop 50 dB"},
+      {"criterion": "C5", "absolute": 0.5, "clip": [1, 5],
+       "why": "ease of use is my own subjective score (±0.5 point)"}
+    ]
+  },
   "efficiency": {
-    "description": "Efficiency (cost vs. benefit) and PROMETHEE V: which printers give the most for the money? Price is the cost criterion, the other five criteria are the benefit.",
+    "description": "Efficiency measuring: which printers give the most for the money? Price is the input (cost) criterion, the other five criteria are the outputs (benefit).",
     "cost_criteria": ["C1"],
     "budget_from": 800,
     "budget_to": 2500

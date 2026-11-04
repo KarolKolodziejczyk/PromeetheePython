@@ -9,8 +9,10 @@ both weighting methods are copied unchanged from the Task 1 spreadsheet.
 not use Visual PROMETHEE. In line with the task rules, nothing from this code
 was put into VP, and no VP-specific output (e.g. the GAIA plane) was recreated.
 Because VP is not used, the sensitivity analysis is extended (Section 5:
-exact stability intervals, a stochastic Monte-Carlo analysis and a fuzzy-set
-analysis), and the chosen extension is **efficiency analysis / PROMETHEE V** (Section 6).
+exact weight stability intervals, Monte-Carlo weight sensitivity and thresholds).
+Uncertainty in the decision matrix is handled with **F-PROMETHEE** (triangular
+fuzzy numbers, Section 5.4), and the chosen extension is **efficiency
+measuring** (Section 6).
 
 All tables come from [`results/results.md`](results/results.md) and
 `results/*.csv`. To regenerate everything, run `python run_analysis.py`.
@@ -242,60 +244,66 @@ printers swap places can be computed exactly.
   price threshold p from 50 to 900 € gives exactly the same ranking. With any
   nozzle threshold p, U1 stays first.
 
-### 5.4 Fuzzy-set stability (triangular fuzzy weights)
+### 5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers
 
-Section 5.2 treats the uncertain weights **stochastically** (random samples).
-Here the same uncertainty is modelled with **fuzzy sets**. I cannot say that
-the price weight is exactly 0.30, only that it is "about 0.30". Each weight w
-therefore becomes a triangular fuzzy number (w·(1−s), w, w·(1+s)). For the
-price weight and s = 20 % this is (0.24, 0.30, 0.36).
+Some values of my decision matrix are not certain. I replaced them with
+**triangular fuzzy numbers (TFN)** (l; m; u): m is the value used so far, and
+l and u are the lowest and highest plausible values. The uncertainty comes
+from my own notes in Task 1:
 
-**How it is computed**
-* An **α-cut** of a fuzzy weight is the interval of values that are plausible
-  at least to degree α:
-  * at α = 1 only the crisp weight remains,
-  * at α = 0 the whole range [w(1−s), w(1+s)] is allowed.
-* For every α, I take **all** weight vectors whose weights lie in their
-  α-cuts and sum to 1, and compute the smallest and the largest possible net
-  flow of every printer. This gives a **fuzzy net flow**: for each α an
-  interval of φ.
-* Because φ = Σⱼ wⱼ φⱼ is linear in the weights, these minima and maxima are
-  computed exactly, not by sampling.
-* To check who wins, I compute the smallest possible value of
-  φ(U1) − φ(b) for each other printer b, using the *same* weight vector for
-  both printers. If it is positive, U1 beats b for every plausible weight
-  vector at that α.
+| Criterion | Fuzzy values | Why uncertain |
+|---|---|---|
+| Price | ±5 % for all printers; **U1: (899; 899; 1099)** | prices differ between shops; 899 € for U1 is a sale price, normally 1099 € |
+| Noise | ±2 dB for all printers; **K2 Plus: (45; 50; 52)** | values come from different sources; for the K2 Plus the manufacturer states 45 dB, the shop 50 dB |
+| Ease of use | ±0.5 point (within 1–5) | my own subjective score |
+| Speed, volume, nozzles | crisp | manufacturer specifications |
 
-![fuzzy stability](results/figures/11_fuzzy_stability.png)
+**How F-PROMETHEE is computed**
+* An **α-cut** of a TFN is the interval of values plausible at least to
+  degree α:
+  * α = 1 gives only m, i.e. the crisp problem;
+  * α = 0 gives the whole range [l, u].
+* For every α (0, 0.05, …, 1) I compute the **smallest and the largest
+  possible net flow** of every printer over all decision matrices inside the
+  α-cuts. This set of intervals is the **fuzzy net flow** of the printer.
+* This is exact, because the net flow is monotone. φ(a) is largest when a's
+  own values are at the good end of their intervals and every other printer's
+  values are at the bad end, and smallest in the opposite case.
+* In a second case the **weights are fuzzy as well** (±20 %:
+  (0.8w; w; 1.2w)). Because φ is linear in the weights, the extreme weights
+  are found exactly with a small linear programme.
+* To check whether U1 *certainly* wins, I compute the smallest possible
+  φ(U1) − φ(b) over everything plausible at level α. If it is positive for
+  every b, U1 beats all printers in every plausible case at that α.
+* Ranking: each fuzzy net flow is defuzzified as the average of its α-cut
+  midpoints.
 
-| Printer | φ at α = 1 | φ range at α = 0, ±20 % | φ range at α = 0, ±50 % |
-|---|---|---|---|
-| A2 Snapmaker U1 | +0.295 | [+0.165, +0.425] | [−0.031, +0.620] |
-| A1 Creality K2 Plus | −0.044 | [−0.111, +0.022] | [−0.210, +0.121] |
-| A3 Bambu Lab H2D | −0.059 | [−0.167, +0.049] | [−0.329, +0.212] |
-| A4 Prusa CORE One | −0.192 | [−0.243, −0.140] | [−0.321, −0.062] |
+![F-PROMETHEE](results/figures/11_f_promethee.png)
 
-* **±20 % fuzzy weights: U1 is the best printer for every plausible weight
-  vector, at every α.** Even at α = 0, its worst case (+0.165) is above the
-  best case of every other printer.
-* **±50 % fuzzy weights:** at α = 0 the intervals overlap. K2 Plus or H2D
-  could beat U1 for some extreme weight combinations. From **α ≈ 0.41**
-  upward, U1 is guaranteed to be best.
-* **Largest guaranteed spread:** U1 stays best for every weight vector in
-  which each weight deviates by up to **±29.7 %** from my base value.
-* The defuzzified net flows (the average of the α-cut midpoints) equal the
-  crisp ones, because the fuzzy weights are symmetric. The fuzzy analysis
-  does not change the ranking. It shows **how much uncertainty the ranking
-  can tolerate**.
+| Printer | φ crisp (α = 1) | φ range α = 0, fuzzy values | defuzzified φ | φ range α = 0, fuzzy values + weights ±20 % | defuzzified φ |
+|---|---|---|---|---|---|
+| A2 Snapmaker U1 | +0.295 | [+0.070, +0.449] | **+0.278** | [−0.048, +0.550] | **+0.274** |
+| A1 Creality K2 Plus | −0.044 | [−0.193, +0.231] | −0.018 | [−0.261, +0.323] | −0.014 |
+| A3 Bambu Lab H2D | −0.059 | [−0.210, −0.010] | −0.081 | [−0.317, +0.108] | −0.078 |
+| A4 Prusa CORE One | −0.192 | [−0.347, +0.010] | −0.179 | [−0.372, +0.098] | −0.169 |
 
-**Stochastic vs. fuzzy.** Both approaches describe the same uncertainty
-about the weights:
-* the Monte-Carlo analysis answers **"how often does U1 win?"**
-  (97 % for ±50 %);
-* the fuzzy analysis answers **"up to which uncertainty is U1 *guaranteed*
-  to win?"** (±29.7 %, or α ≥ 0.41 for ±50 %).
-
-Both lead to the same conclusion: U1 is a robust winner.
+* **The F-PROMETHEE ranking is the same as the crisp one: U1 ≻ K2 Plus ≻
+  H2D ≻ CORE One**, in both cases. The uncertainty does not change the
+  recommendation.
+* **U1 has the only fuzzy net flow that stays positive** over the whole
+  support (fuzzy values case).
+* **Defuzzified U1 is slightly lower than crisp U1** (0.278 vs 0.295). Its
+  price TFN is one-sided (899 → 1099 €): the price can only go up.
+* **Guaranteed winner:**
+  * with fuzzy values, U1 beats every printer in every plausible case for
+    **α ≥ 0.23**;
+  * with fuzzy values and fuzzy weights, for **α ≥ 0.43**.
+* **Where U1 could lose:** only at the bottom of the TFNs, when the K2 Plus
+  is as quiet as the manufacturer claims (45 dB) *and* U1 costs its regular
+  1099 €. Even then this needs the most unfavourable values on all uncertain
+  criteria at once.
+* **The K2 Plus has the widest fuzzy flow.** Its noise value has the
+  largest uncertainty, 45–52 dB.
 
 ### 5.5 What if the Bambu H2D goes on sale? (continues Task 1, Section 6)
 
@@ -321,7 +329,7 @@ Both lead to the same conclusion: U1 is a robust winner.
   300 € (= p) more expensive than every other printer, so further price
   increases cannot make it any worse on price.
 
-## 6. Extension – efficiency analysis and PROMETHEE V
+## 6. Extension – efficiency measuring
 
 **Why this extension.** The goal of Task 1 was literally *"find the printer
 that gives me the most for my money"*. An efficiency analysis answers exactly
@@ -329,11 +337,13 @@ that question: it separates **what I pay** from **what I get**.
 * Group decision-making is not useful here: there is only one decision maker.
 * Sorting would classify the printers, but it would not show the trade-off
   between money and quality.
+* PROMETHEE V (portfolio) only makes sense when alternatives are combined,
+  e.g. a fleet. I buy one printer, so it does not apply.
 
-### 6.1 Cost vs. benefit flows
+### 6.1 Input vs. output flows and the efficient frontier
 
-The criteria are split into the **cost** criterion (price, weight 0.30) and
-the **benefit** criteria (noise, speed, volume, ease of use, nozzles, weights
+The criteria are split into the **input (cost)** criterion (price, weight
+0.30) and the **output (benefit)** criteria (noise, speed, volume, ease of use, nozzles, weights
 0.15 / 0.10 / 0.12 / 0.08 / 0.25, renormalised to sum to 1). From the same
 unicriterion flows φⱼ as in the ranking I compute:
 
@@ -366,19 +376,14 @@ scores and strictly better on one (Pareto, non-dominated).
   fast, has a larger volume and is the easiest to use, but has 2 nozzles
   instead of 4.
 
-### 6.2 PROMETHEE V – best printer for a given budget
+### 6.2 Reading the frontier – best printer for a given budget
 
-PROMETHEE V selects alternatives that maximise the total net flow under
-linear constraints. Here the 0-1 programme is:
+For a given budget, the frontier shows the best printer I can afford: among
+all printers with price ≤ budget, the one with the highest benefit flow.
 
-  max Σ φ benefit(a) · xₐ   s.t.   Σ price(a) · xₐ ≤ budget,   Σ xₐ = 1,   xₐ ∈ {0, 1}
+![budget choice](results/figures/10_budget_choice.png)
 
-In words: buy exactly one printer, the one with the most benefit that I can
-afford. With 4 printers it is solved exactly by enumeration.
-
-![PROMETHEE V budget](results/figures/10_promethee_v_budget.png)
-
-| Budget | PROMETHEE V choice |
+| Budget | Best choice |
 |---|---|
 | below 899 € | nothing affordable |
 | 899 – 2124 € | **Snapmaker U1** |
@@ -388,10 +393,9 @@ afford. With 4 printers it is solved exactly by enumeration.
   Plus and CORE One are never chosen, at any budget. This confirms that they
   are dominated.
 * **With my budget of 2500 €:**
-  * If price is *only a constraint*, PROMETHEE V on the benefit flow picks
-    H2D.
-  * If price is also a *criterion* (weight 0.30, as in my problem),
-    PROMETHEE V on the full net flow picks **U1**.
+  * If price is *only a limit*, the best printer I can afford is H2D.
+  * If price is also a *criterion* (weight 0.30, as in my problem), the full
+    net flow picks **U1**.
 
   The difference is exactly the question "do I want the best printer I can
   afford, or the best value for money?". My goal in Task 1 was value for
@@ -425,8 +429,9 @@ Share of random weight vectors (20 000) for which each printer is efficient:
      dominates K2 Plus and CORE One: they are more expensive *and* offer less.
    * It stays first for ±20 % weight uncertainty (100 %), ±50 % (97 %), and
      every threshold variant.
-   * The fuzzy-set analysis guarantees that it is best for every weight
-     vector within ±29.7 % of my weights.
+   * F-PROMETHEE gives the same ranking with uncertain prices, noise values
+     and ease-of-use scores. U1 is the guaranteed winner from α = 0.23 (from
+     α = 0.43 with fuzzy weights as well).
 
    **My Task 1 guess and the WSM result are confirmed by PROMETHEE.**
 2. **Why U1 wins:** my two most important criteria, price (0.30) and nozzles

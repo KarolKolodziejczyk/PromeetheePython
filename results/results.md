@@ -198,22 +198,37 @@ Other weights keep their proportions. `best` = A2 Snapmaker U1.
 | thresholds x2 | 2 | 1 | 4 | 3 | 0.667 | A2 |
 | all 'usual' (type I) | 3 | 1 | 2 | 4 | 0.667 | A2 |
 
-### 5.4 Fuzzy-set stability (triangular fuzzy weights)
+### 5.4 F-PROMETHEE – fuzzy decision matrix (triangular fuzzy numbers)
 
-Every weight w is replaced by the triangular fuzzy number (w·(1−s), w, w·(1+s)). For each α-cut the min / max net flow over all weight vectors inside the cuts (summing to 1) is computed exactly.
+F-PROMETHEE: uncertain values of the decision matrix are triangular fuzzy numbers (low, value used, high); optionally the weights are fuzzy too.
 
-| alternative | spread | φ α=0 (min) | φ α=0 (max) | φ α=0.5 (min) | φ α=0.5 (max) | φ α=1 | defuzzified φ | min φ(A2) − φ(·) α=0 | min φ(A2) − φ(·) α=0.5 | A2 guaranteed best from α |
+Fuzzy decision matrix (l; m; u):
+
+| Alternative | Price [EUR] | Noise [dB(A)] | Max speed [mm/s] | Build volume [dm3] | Ease of use [1-5] | Nozzles [pcs] |
+|---|---|---|---|---|---|---|
+| A1 Creality K2 Plus Combo | (1128; 1187; 1246) | (45; 50; 52) | 600 | 42.875 | (2.5; 3; 3.5) | 1 |
+| A2 Snapmaker U1 | (899; 899; 1099) | (53; 55; 57) | 500 | 19.683 | (3.5; 4; 4.5) | 4 |
+| A3 Bambu Lab H2D | (2019; 2125; 2231) | (47.1; 49.1; 51.1) | 1000 | 33.8 | (4.5; 5; 5) | 2 |
+| A4 Prusa CORE One | (1218; 1282; 1346) | (46; 48; 50) | 600 | 14.85 | (3.5; 4; 4.5) | 1 |
+
+| criterion | why uncertain |
+|---|---|
+| Price [EUR] | prices change from shop to shop (±5 %); the U1 price of 899 EUR is a sale price, normally 1099 EUR |
+| Noise [dB(A)] | noise values come from different sources (±2 dB); for the K2 Plus the manufacturer states 45 dB, the shop 50 dB |
+| Ease of use [1-5] | ease of use is my own subjective score (±0.5 point) |
+
+Fuzzy net flows (α-cuts), defuzzified ranking and guaranteed winner:
+
+| alternative | case | φ α=0 min | φ α=0 max | φ α=0.5 min | φ α=0.5 max | φ α=1 (crisp) | defuzzified φ | rank (defuzzified) | min φ(A2) − φ(·) at α=0 | A2 guaranteed best from α |
 |---|---|---|---|---|---|---|---|---|---|---|
-| A1 Creality K2 Plus Combo | ±20% | -0.111 | +0.022 | -0.078 | -0.011 | -0.044 | -0.044 | +0.183 | +0.261 | +0.000 |
-| A2 Snapmaker U1 | ±20% | +0.165 | +0.425 | +0.230 | +0.360 | +0.295 | +0.295 | – | – | +0.000 |
-| A3 Bambu Lab H2D | ±20% | -0.167 | +0.049 | -0.113 | -0.005 | -0.059 | -0.059 | +0.115 | +0.235 | +0.000 |
-| A4 Prusa CORE One | ±20% | -0.243 | -0.140 | -0.218 | -0.166 | -0.192 | -0.192 | +0.346 | +0.416 | +0.000 |
-| A1 Creality K2 Plus Combo | ±50% | -0.210 | +0.121 | -0.127 | +0.038 | -0.044 | -0.044 | -0.051 | +0.144 | +0.407 |
-| A2 Snapmaker U1 | ±50% | -0.031 | +0.620 | +0.132 | +0.458 | +0.295 | +0.295 | – | – | +0.407 |
-| A3 Bambu Lab H2D | ±50% | -0.329 | +0.212 | -0.194 | +0.077 | -0.059 | -0.059 | -0.242 | +0.056 | +0.407 |
-| A4 Prusa CORE One | ±50% | -0.321 | -0.062 | -0.256 | -0.127 | -0.192 | -0.192 | +0.136 | +0.311 | +0.407 |
-
-A2 Snapmaker U1 is the best printer for **every** weight vector within ±29.7% of each base weight (largest guaranteed spread).
+| A1 Creality K2 Plus Combo | fuzzy values, crisp weights | -0.193 | +0.231 | -0.116 | +0.098 | -0.044 | -0.018 | 2 | -0.086 | +0.228 |
+| A2 Snapmaker U1 | fuzzy values, crisp weights | +0.070 | +0.449 | +0.179 | +0.373 | +0.295 | +0.278 | 1 | – | +0.228 |
+| A3 Bambu Lab H2D | fuzzy values, crisp weights | -0.210 | -0.010 | -0.136 | -0.039 | -0.059 | -0.081 | 3 | +0.099 | +0.228 |
+| A4 Prusa CORE One | fuzzy values, crisp weights | -0.347 | +0.010 | -0.250 | -0.110 | -0.192 | -0.179 | 4 | +0.112 | +0.228 |
+| A1 Creality K2 Plus Combo | fuzzy values + fuzzy weights ±20% | -0.261 | +0.323 | -0.145 | +0.134 | -0.044 | -0.014 | 2 | -0.240 | +0.433 |
+| A2 Snapmaker U1 | fuzzy values + fuzzy weights ±20% | -0.048 | +0.550 | +0.115 | +0.431 | +0.295 | +0.274 | 1 | – | +0.433 |
+| A3 Bambu Lab H2D | fuzzy values + fuzzy weights ±20% | -0.317 | +0.108 | -0.182 | +0.017 | -0.059 | -0.078 | 3 | -0.123 | +0.433 |
+| A4 Prusa CORE One | fuzzy values + fuzzy weights ±20% | -0.372 | +0.098 | -0.270 | -0.076 | -0.192 | -0.169 | 4 | -0.020 | +0.433 |
 
 ### 5.5 What-if: What if the Bambu Lab H2D goes on sale? (Task 1, section 6)
 
@@ -232,9 +247,9 @@ Varying `Price [EUR]` of A3 Bambu Lab H2D (current value 2125), base weights.
 
 Winner changes at: 1096
 
-## 6. Extension – efficiency analysis and PROMETHEE V
+## 6. Extension – efficiency measuring
 
-Efficiency (cost vs. benefit) and PROMETHEE V: which printers give the most for the money? Price is the cost criterion, the other five criteria are the benefit.
+Efficiency measuring: which printers give the most for the money? Price is the input (cost) criterion, the other five criteria are the outputs (benefit).
 
 ### Cost and benefit flows, efficient set
 
@@ -251,15 +266,15 @@ Efficiency (cost vs. benefit) and PROMETHEE V: which printers give the most for 
 |---|---|---|---|---|
 | A2 Snapmaker U1 | A3 Bambu Lab H2D | 1226 | +0.345 | 355 |
 
-### PROMETHEE V: best printer (max φ benefit, buy exactly one) for each budget
+### Reading the frontier: best printer (max φ benefit) for each budget
 
-| budget from [EUR] | PROMETHEE V choice | φ benefit |
+| budget from [EUR] | best choice | φ benefit |
 |---|---|---|
 | 800 | nothing affordable | – |
 | 899 | A2 Snapmaker U1 | -0.000 |
 | 2125 | A3 Bambu Lab H2D | +0.345 |
 
-With the Task 1 budget of 2500 EUR: PROMETHEE V on the benefit flow selects **A3 Bambu Lab H2D**; PROMETHEE V on the full net flow (price as a criterion) selects **A2 Snapmaker U1**.
+With the Task 1 budget of 2500 EUR: maximising the benefit flow selects **A3 Bambu Lab H2D**; maximising the full net flow (price as a criterion) selects **A2 Snapmaker U1**.
 
 ### Robustness: share of random weight vectors for which a printer is efficient
 

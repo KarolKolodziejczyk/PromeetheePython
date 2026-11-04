@@ -1,4 +1,4 @@
-"""Efficiency analysis and PROMETHEE V (own code).
+"""Efficiency measuring (own code).
 
 Efficiency (cost vs. benefit)
 -----------------------------
@@ -14,18 +14,12 @@ An alternative is EFFICIENT if no other alternative is at least as good on
 both scores and strictly better on one (Pareto / non-dominated).  Moving along
 the efficient frontier shows how much extra money buys how much extra benefit.
 
-PROMETHEE V (Brans & Mareschal, 1992)
-------------------------------------
-Select a subset of alternatives maximising the total net flow under linear
-constraints:
-
-    max  sum_a phi(a) x_a
-    s.t. sum_a cost(a) x_a <= budget,   min_items <= sum_a x_a <= max_items,
-         x_a in {0, 1}
-
-With few alternatives the 0-1 programme is solved exactly by enumeration.
-Here: buy exactly one printer, maximise the BENEFIT flow, price enters as the
-budget constraint -> "the best printer I can get for budget B".
+Best choice for a budget
+------------------------
+Reading the frontier for a budget B: among the printers with price <= B,
+take the one with the highest benefit flow.  (This is NOT PROMETHEE V:
+PROMETHEE V selects a portfolio, i.e. a combination of several alternatives;
+here exactly one printer is bought.)
 """
 from __future__ import annotations
 
@@ -59,9 +53,9 @@ def efficient_set(benefit: np.ndarray, cost_score: np.ndarray) -> np.ndarray:
     return eff
 
 
-def promethee_v(scores: np.ndarray, costs: np.ndarray, budget: float,
-                min_items: int = 1, max_items: int = 1):
-    """Exact PROMETHEE V by enumeration. Returns (best subset tuple, total score)."""
+def best_within_budget(scores: np.ndarray, costs: np.ndarray, budget: float,
+                       min_items: int = 1, max_items: int = 1):
+    """Best affordable choice by enumeration. Returns (best subset tuple, total score)."""
     n = len(scores)
     best, best_val = (), -np.inf
     for k in range(min_items, max_items + 1):
@@ -74,10 +68,10 @@ def promethee_v(scores: np.ndarray, costs: np.ndarray, budget: float,
 
 
 def budget_sweep(scores: np.ndarray, costs: np.ndarray, budgets):
-    """PROMETHEE V choice (one item) for every budget; -1 = nothing affordable."""
+    """Best affordable printer for every budget; -1 = nothing affordable."""
     out = []
     for b in budgets:
-        sub, _ = promethee_v(scores, costs, b)
+        sub, _ = best_within_budget(scores, costs, b)
         out.append(sub[0] if sub else -1)
     return np.array(out)
 

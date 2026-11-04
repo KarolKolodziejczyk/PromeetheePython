@@ -13,8 +13,8 @@ data/problem.json          ← dane z Task 1 + parametry PROMETHEE
         ▼
 promethee/core.py          ← funkcje preferencji, PROMETHEE I i II, WSM (P×W)
 promethee/sensitivity.py   ← analiza wrażliwości (wagi, Monte Carlo, progi)
-promethee/fuzzy.py         ← stabilność przez zbiory rozmyte (fuzzy)
-promethee/efficiency.py    ← rozszerzenie: Efficiency / PROMETHEE V
+promethee/fuzzy.py         ← F-PROMETHEE (niepewne wartości jako liczby rozmyte)
+promethee/efficiency.py    ← rozszerzenie: Efficiency measuring
         │
         ▼
 run_analysis.py            ← uruchamia wszystko po kolei, zapisuje tabele i wykresy
@@ -46,7 +46,8 @@ REPORT.md (interpretacja)    PROMETHEE_Colab.ipynb (to samo w Colabie)
 | `weight_scenarios` | 7 zestawów wag do porównania: M1, M2 (rank sum), równe, 0.2/0.15 i 3 scenariusze z Task 1 |
 | `weighted_sum_normalisation` | `"ratio"`: normalizacja taka jak w arkuszu z Task 1 (min/x oraz x/max) |
 | `what_if` | analiza „co jeśli H2D będzie tańszy” (kontynuacja sekcji 6 z Task 1) |
-| `efficiency` | które kryterium jest kosztem (cena) i zakres budżetów dla PROMETHEE V |
+| `fuzzy` | które wartości są niepewne i jakie mają trójkątne liczby rozmyte (wymaganie 5) |
+| `efficiency` | które kryterium jest wejściem/kosztem (cena) i zakres budżetów |
 
 ---
 
@@ -271,39 +272,52 @@ miejscu r + 1. Dla U1 przy ±20 % wynosi 100 % na 1. miejscu.
 Tutaj trzeba liczyć PROMETHEE od nowa, bo zmiana progów zmienia macierze P.
 `copy.deepcopy` zapewnia, że oryginalne kryteria zostają nienaruszone.
 
-### 3.6 `promethee/fuzzy.py` – stabilność przez zbiory rozmyte (fuzzy sets)
+### 3.6 `promethee/fuzzy.py` – F-PROMETHEE (wymaganie 5a)
 
-Monte Carlo (3.4) opisuje niepewność wag **losowo**. Tutaj ta sama niepewność
-jest opisana **zbiorami rozmytymi**.
+Doktor wymaga, żeby **niektóre wartości z macierzy decyzyjnej** zastąpić
+liczbami rozmytymi tam, gdzie niepewność jest realna. Wybrałem:
+* **cenę**: ±5 %, a dla U1 (899; 899; 1099), bo 899 € to promocja;
+* **hałas**: ±2 dB, a dla K2 (45; 50; 52), bo producent podaje 45 dB;
+* **łatwość obsługi**: ±0.5, bo to moja subiektywna ocena.
 
-* `triangular_weights`: każda waga w staje się liczbą trójkątną
-  (w·(1−s), w, w·(1+s)). Na przykład dla ceny i s = 20 % to (0.24; 0.30; 0.36),
-  czyli „około 0.30”.
-* `alpha_cut`: **α-przekrój**, czyli przedział wag wiarygodnych co najmniej w
-  stopniu α. Przy α = 1 zostaje tylko moja dokładna waga; przy α = 0 cały
-  zakres trójkąta.
-* `extreme_linear`: dla danego α szuka **najmniejszego i największego φ** po
-  wszystkich wagach z przekrojów, których suma wynosi 1. Ponieważ
-  φ = Σ wⱼ φⱼ jest liniowe w wagach, wystarczy rozwiązanie zachłanne: zacznij
-  od dolnych granic i „dosypuj” resztę wagi najpierw tam, gdzie φⱼ jest
-  najwyższe (dla max) albo najniższe (dla min). Wynik jest dokładny.
-* `fuzzy_flows`: robi to dla każdego α i każdej drukarki. Wynikiem jest
-  **rozmyty przepływ netto** (wykres `11_fuzzy_stability.png`, trójkąty).
-* `guaranteed_margin`: najmniejsza możliwa różnica φ(U1) − φ(b), liczona przy
-  *tych samych* wagach dla obu drukarek. Jeśli jest > 0, U1 wygrywa z b dla
-  każdych wag z przekroju.
-* `guaranteed_alpha`: od jakiego α wygrana U1 jest pewna. Dla ±50 % to α ≈ 0.41.
-* `robust_spread`: największy rozrzut s, przy którym U1 na pewno wygrywa w
-  całym trójkącie. Wynik: **±29.7 %**. Szukane bisekcją.
+Funkcje:
+* `fuzzy_matrix`: buduje z ustawień w JSON trzy macierze L, M, U (minimum,
+  wartość, maksimum). M to zwykła macierz z Task 1.
+* `matrix_cut`: **α-przekrój**. Dla każdej wartości daje przedział
+  [L + α(M − L), U − α(U − M)]. Przy α = 1 to zwykłe dane, przy α = 0 cały
+  zakres niepewności.
+* `fuzzy_net_flows`: dla każdego α i każdej drukarki szuka **najmniejszego i
+  największego możliwego φ**. Trik: φ drukarki a jest **monotoniczne**, czyli
+  rośnie, gdy wartości a są lepsze, a wartości innych drukarek gorsze
+  (funkcje preferencji są niemalejące). Dlatego:
+  * max φ(a): a na dobrym końcu swoich przedziałów, reszta na złym;
+  * min φ(a): odwrotnie.
+
+  Wynik jest dokładny i nie wymaga losowania.
+* `triangular_weights`, `alpha_cut`, `extreme_linear`: to samo dla
+  **rozmytych wag** (±20 %). φ jest liniowe w wagach, więc najkorzystniejsze
+  wagi znajduje się zachłannie: zacznij od dolnych granic i „dosypuj” resztę
+  wagi tam, gdzie φⱼ jest najwyższe (dla max) albo najniższe (dla min).
+* `guaranteed_margin`: najmniejsza możliwa różnica φ(U1) − φ(b). U1 ustawiam
+  na złym końcu, b na dobrym, a pozostałe drukarki dobieram tak, żeby było
+  najgorzej dla U1 (osobno dla każdego kryterium, na gęstej siatce). Jeśli
+  wynik jest > 0, U1 wygrywa z b w każdym wiarygodnym przypadku.
+* `guaranteed_alpha`: od jakiego α U1 wygrywa na pewno:
+  * 0.23 przy rozmytych wartościach,
+  * 0.43 przy rozmytych wartościach i wagach.
+* `defuzzify`: zamienia rozmyty przepływ na jedną liczbę (średnia ze środków
+  przekrojów). Na tej podstawie powstaje ranking F-PROMETHEE: U1 > K2 > H2D
+  > Prusa.
 
 Testy:
-* przy α = 1 wynik równa się zwykłemu φ;
-* losowe wagi z trójkąta nigdy nie wychodzą poza policzone przedziały;
+* przy α = 1 wynik równa się zwykłemu PROMETHEE;
+* 3000 losowych macierzy i wag z zakresu niepewności nigdy nie wychodzi poza
+  policzone granice;
 * algorytm zachłanny daje poprawny wynik na małym przykładzie.
 
 ---
 
-## 4. `promethee/efficiency.py` – rozszerzenie Efficiency / PROMETHEE V
+## 4. `promethee/efficiency.py` – rozszerzenie Efficiency measuring
 
 Cel z Task 1: *„find the printer that gives me the most for my money”*. Ta
 analiza oddziela **to, co płacę** od **tego, co dostaję**.
@@ -317,7 +331,9 @@ dwie grupy:
   0.15 / 0.10 / 0.12 / 0.08 / 0.25 są przeskalowane tak, żeby sumowały się do 1.
 
 Sprawdzenie: 0.30 · φ kosztu + 0.70 · φ korzyści = zwykłe φ z rankingu
-(test `test_efficiency_and_promethee_v`).
+(test `test_efficiency_and_budget_choice`).
+
+W języku doktora: cena to **wejście (input)**, a pozostałe kryteria to **wyjścia (outputs)**.
 
 ### 4.2 `efficient_set` – kto jest efektywny
 
@@ -330,24 +346,17 @@ Wynik:
 * efektywne są tylko U1 (najtańsza) i H2D (najlepsza);
 * K2 Plus i Prusa są zdominowane przez U1.
 
-### 4.3 `promethee_v` – PROMETHEE V
+### 4.3 `best_within_budget` i `budget_sweep` – odczyt z granicy efektywności
 
-PROMETHEE V (Brans & Mareschal, 1992) wybiera **zbiór** alternatyw o
-największej sumie φ przy ograniczeniach liniowych. Formalnie to zadanie
-programowania 0-1 (xₐ = 1 oznacza „biorę”):
-
-  max Σ φ(a)·xₐ   przy   Σ cena(a)·xₐ ≤ budżet,   min ≤ Σ xₐ ≤ max
-
-U nas kupuję dokładnie jedną drukarkę (min = max = 1). Przy 4 drukarkach
-kod po prostu sprawdza wszystkie możliwości (`itertools.combinations`).
-Wynik jest dokładny.
-
-### 4.4 `budget_sweep` – najlepsza drukarka dla każdego budżetu
-
-Uruchamia PROMETHEE V dla budżetów od 800 do 2500 € co 1 € i zapamiętuje
-wybór:
+Dla budżetu B bierze drukarki z ceną ≤ B i wybiera tę o największym φ
+korzyści. `budget_sweep` robi to dla budżetów od 800 do 2500 € co 1 €:
 * 899–2124 € → U1,
 * od 2125 € → H2D.
+
+**To nie jest PROMETHEE V.** PROMETHEE V wybiera **portfel**, czyli
+kombinację kilku alternatyw (np. flotę samochodów dla firmy). Doktor pisze,
+że ma sens tylko wtedy, gdy łączy się alternatywy. Ja kupuję jedną drukarkę,
+więc PROMETHEE V nie pasuje.
 
 ### 4.5 `efficiency_acceptability` – odporność
 
@@ -372,8 +381,8 @@ i fragment `results.md`.
 | `sensitivity: weights` | przedziały stabilności, wykresy wag, Monte Carlo | `weight_stability_intervals.csv`, `05_…`, `06_…` |
 | `sensitivity: thresholds` | skalowanie progów i wariant „usual” | `threshold_sensitivity.csv`, `07_…` |
 | `what-if` | cena H2D od 700 do 2500 € w 361 krokach; punkt zmiany zwycięzcy liczony interpolacją liniową (≈ 1096 €) | `what_if.csv`, `08_…` |
-| `fuzzy` | rozmyte przepływy dla wag ±20 % i ±50 %, pewny zwycięzca | `fuzzy_stability.csv`, `11_…` |
-| `efficiency / PROMETHEE V` | φ korzyści i kosztu, zbiór efektywny, wybór dla każdego budżetu, odporność | `efficiency*.csv`, `promethee_v_budget.csv`, `09_…`, `10_…` |
+| `F-PROMETHEE` | macierz TFN, rozmyte przepływy (same wartości oraz wartości + wagi ±20 %), ranking po defuzyfikacji, pewny zwycięzca | `fuzzy_decision_matrix.csv`, `fuzzy_promethee.csv`, `11_…` |
+| `efficiency` | φ korzyści i kosztu, zbiór efektywny (granica), wybór dla każdego budżetu, odporność | `efficiency*.csv`, `budget_choice.csv`, `09_…`, `10_…` |
 
 Funkcje pomocnicze:
 * `md_table` zamienia tabelę pandas na tabelę Markdown;
@@ -396,7 +405,7 @@ Uruchomienie: `python run_analysis.py` (domyślnie `data/problem.json`) albo
 | `test_stability_intervals_are_exact` | ranking jest stały wewnątrz przedziału, a zmienia się tuż za granicą |
 | `test_monte_carlo_rows_sum_to_one` | macierz akceptowalności jest poprawna: wiersze i kolumny sumują się do 1 |
 | `test_wsm_reproduces_task1_spreadsheet` | WSM daje dokładnie wyniki z arkusza Task 1 |
-| `test_efficiency_and_promethee_v` | φ korzyści i kosztu składają się na φ; najtańsza i najlepsza są efektywne; PROMETHEE V przy zerowym budżecie nic nie wybiera, a bez limitu wybiera najlepszą |
+| `test_efficiency_and_budget_choice` | φ korzyści i kosztu składają się na φ; najtańsza i najlepsza są efektywne; przy zbyt małym budżecie nic nie jest wybierane, a bez limitu wybierana jest najlepsza |
 | `test_kendall_tau` | τ = 1 dla identycznych i −1 dla odwróconych rankingów |
 
 Uruchomienie: `python -m pytest -q`.
@@ -418,7 +427,7 @@ Uruchomienie: `python -m pytest -q`.
 
 **Dlaczego własny kod, a nie Visual PROMETHEE?**
 Zadanie pozwala na jedno albo drugie. Własny kod pozwala zrobić analizy,
-których VP nie ma: dokładne przedziały stabilności, Monte Carlo, fuzzy, efficiency z PROMETHEE V i
+których VP nie ma: dokładne przedziały stabilności, Monte Carlo, F-PROMETHEE, efficiency i
 analizę ceny H2D. Zgodnie z instrukcją nie odtwarzam wyników VP, w tym
 płaszczyzny GAIA.
 
@@ -455,30 +464,22 @@ Przepływ netto jest liniowy względem wag, więc każda para alternatyw zmienia
 kolejność w dokładnie jednym punkcie, który da się wyliczyć wzorem. Nie
 trzeba przeszukiwać siatki wartości.
 
-**Dlaczego rozszerzenie Efficiency / PROMETHEE V?**
+**Dlaczego rozszerzenie Efficiency?**
 * Cel z Task 1 to dosłownie *„the printer that gives me the most for my
   money”*, a analiza efektywności odpowiada dokładnie na to pytanie.
+* Mam naturalne wejście (cena) i wyjścia (to, co drukarka oferuje).
 * Pokazuje, że K2 Plus i Prusa są zdominowane: U1 jest od nich tańsza i
   lepsza.
 * Pokazuje, że jedyny prawdziwy wybór to „U1 albo dopłacić 1226 € do H2D”.
-* Jest jeden decydent, więc decyzja grupowa nie ma sensu.
+* Jest jeden decydent, więc GDSS nie ma sensu. PROMETHEE V służy do łączenia
+  alternatyw w portfel, a ja kupuję jedną drukarkę.
 
-**Jaka jest różnica między PROMETHEE V a zwykłym rankingiem?**
-* Ranking porządkuje drukarki.
-* PROMETHEE V **wybiera** najlepszą drukarkę **przy ograniczeniu budżetu**.
-  * Przy 2500 € i samych korzyściach wybrałby H2D, czyli najlepszą drukarkę,
-    na jaką mnie stać.
-  * Gdy cena jest też kryterium, wybiera U1, czyli najlepszy stosunek jakości
-    do ceny.
-
-**Stochastycznie czy fuzzy?**
-Zrobiłem oba podejścia:
-* Monte Carlo (stochastyczne) odpowiada na pytanie „jak często U1 wygrywa?”:
-  97 % przy ±50 %.
-* Fuzzy odpowiada na pytanie „do jakiej niepewności wygrana U1 jest pewna?”:
-  ±29.7 % każdej wagi.
-
-Oba prowadzą do tego samego wniosku: U1 to stabilny zwycięzca.
+**Dlaczego F-PROMETHEE, a nie Monte Carlo, w wymaganiu 5?**
+* Niepewność w moich danych to przedziały typu „od–do” (45–50 dB, 899–1099 €),
+  a nie rozkłady prawdopodobieństwa, których nie znam. Trójkątna liczba
+  rozmyta opisuje to naturalnie.
+* Doktor zaleca F-PROMETHEE osobom, które piszą własny kod w Pythonie.
+* Monte Carlo na wagach zostało jako zwykła analiza wrażliwości (5.2).
 
 **Co oznacza 62 % dla H2D w Monte Carlo przy losowych wagach?**
 Gdyby wagi były zupełnie przypadkowe, H2D wygrywałaby najczęściej, bo

@@ -1,5 +1,5 @@
 """Run the complete Task 2 analysis: PROMETHEE I/II, ranking comparison,
-sensitivity analysis, what-if analysis and the efficiency / PROMETHEE V extension.
+sensitivity analysis, F-PROMETHEE, what-if analysis and the efficiency extension.
 
 Usage:  python run_analysis.py [path/to/problem.json]
 
@@ -20,10 +20,10 @@ from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 
 from promethee import (Problem, kendall_tau, promethee, promethee_I,  # noqa: E402
                        ranks_from_scores, spearman_rho, weighted_sum)
-from promethee.efficiency import (budget_sweep, efficiency_acceptability,  # noqa: E402
-                                  efficient_set, promethee_v, split_flows)
-from promethee.fuzzy import (defuzzify, fuzzy_flows, guaranteed_alpha,  # noqa: E402
-                             guaranteed_margin, robust_spread)
+from promethee.efficiency import (best_within_budget, budget_sweep,  # noqa: E402
+                                  efficiency_acceptability, efficient_set, split_flows)
+from promethee.fuzzy import (defuzzify, fuzzy_matrix, fuzzy_net_flows,  # noqa: E402
+                             guaranteed_alpha, guaranteed_margin)
 from promethee.sensitivity import (monte_carlo, single_threshold_sweep,  # noqa: E402
                                    stability_intervals, threshold_sensitivity,
                                    weight_sweep)
@@ -386,60 +386,80 @@ def main(path: str):
         fig.tight_layout()
         save(fig, "07_threshold_sweeps.png")
 
-    # ------------------------------------- sensitivity: fuzzy-set weights
-    best = int(np.argmax(res.phi))
-    alphas = np.linspace(0, 1, 101)
-    fz_rows, fz_flows = [], {}
-    for spread in (0.2, 0.5):
-        lo, hi = fuzzy_flows(res.phi_j, pb.weights, spread, alphas)
-        fz_flows[spread] = (lo, hi)
-        marg = guaranteed_margin(res.phi_j, pb.weights, spread, [0.0, 0.5, 1.0], best)
-        a_star = guaranteed_alpha(res.phi_j, pb.weights, spread, best)
-        for i in range(n):
-            fz_rows.append({
-                "spread": f"±{spread:.0%}", "alternative": pb.labels[i],
-                "φ α=0 (min)": lo[0, i], "φ α=0 (max)": hi[0, i],
-                "φ α=0.5 (min)": lo[50, i], "φ α=0.5 (max)": hi[50, i],
-                "φ α=1": lo[-1, i], "defuzzified φ": defuzzify(lo, hi)[i],
-                f"min φ({A[best]}) − φ(·) α=0": marg[0, i] if i != best else np.nan,
-                f"min φ({A[best]}) − φ(·) α=0.5": marg[1, i] if i != best else np.nan,
-                f"{A[best]} guaranteed best from α": a_star,
-            })
-    fz_df = pd.DataFrame(fz_rows).set_index(["spread", "alternative"])
-    fz_df.to_csv(OUT / "fuzzy_stability.csv")
-    rs = robust_spread(res.phi_j, pb.weights, best)
-    md += ["### 5.4 Fuzzy-set stability (triangular fuzzy weights)\n",
-           "Every weight w is replaced by the triangular fuzzy number "
-           "(w·(1−s), w, w·(1+s)). For each α-cut the min / max net flow over all "
-           "weight vectors inside the cuts (summing to 1) is computed exactly.\n",
-           md_table(fz_df.reset_index().set_index("alternative"), "{:+.3f}"), "",
-           f"{pb.labels[best]} is the best printer for **every** weight vector "
-           f"within ±{rs:.1%} of each base weight (largest guaranteed spread).\n"]
+    # ------------------------------------------------ F-PROMETHEE (fuzzy)
+    fz = pb.config.get("fuzzy")
+    if fz:
+        L, M, U = fuzzy_matrix(pb.X, pb.criteria, A, fz["values"])
+        fuzzy_cols = sorted({C.index(s["criterion"]) for s in fz["values"]})
+        def _f(v):
+            return f"{v:.0f}" if abs(v) >= 100 else f"{v:g}"
+        tfn = pd.DataFrame({cnames[j]: [f"({_f(L[i, j])}; {_f(M[i, j])}; {_f(U[i, j])})"
+                                        if L[i, j] != U[i, j] else f"{M[i, j]:g}"
+                                        for i in range(n)] for j in range(m)},
+                           index=pb.labels)
+        tfn.index.name = "Alternative"
+        tfn.to_csv(OUT / "fuzzy_decision_matrix.csv")
+        why = pd.DataFrame({"criterion": [cnames[C.index(s["criterion"])] for s in fz["values"]],
+                            "why uncertain": [s.get("why", "") for s in fz["values"]]})
+        why = why.set_index("criterion")
+        ws = float(fz.get("weight_spread", 0.0))
+        cases = {"fuzzy values, crisp weights": 0.0}
+        if ws > 0:
+            cases[f"fuzzy values + fuzzy weights ±{ws:.0%}"] = ws
+        best = int(np.argmax(res.phi))
+        alphas = np.linspace(0, 1, 21)
+        rows, curves = [], {}
+        for cname, spread in cases.items():
+            lo, hi = fuzzy_net_flows(L, M, U, pb.criteria, pb.weights, spread, alphas)
+            curves[cname] = (lo, hi)
+            dz = defuzzify(lo, hi)
+            rk = ranks_from_scores(dz)
+            a_star = guaranteed_alpha(L, M, U, pb.criteria, pb.weights, spread, best)
+            for i in range(n):
+                rows.append({"case": cname, "alternative": pb.labels[i],
+                             "φ α=0 min": lo[0, i], "φ α=0 max": hi[0, i],
+                             "φ α=0.5 min": lo[10, i], "φ α=0.5 max": hi[10, i],
+                             "φ α=1 (crisp)": lo[-1, i], "defuzzified φ": dz[i],
+                             "rank (defuzzified)": int(rk[i]),
+                             f"min φ({A[best]}) − φ(·) at α=0": (
+                                 guaranteed_margin(L, M, U, pb.criteria, pb.weights, spread,
+                                                   0.0, best, i) if i != best else np.nan),
+                             f"{A[best]} guaranteed best from α": a_star})
+        fp = pd.DataFrame(rows).set_index("alternative")
+        fp.to_csv(OUT / "fuzzy_promethee.csv")
+        md += ["### 5.4 F-PROMETHEE – fuzzy decision matrix (triangular fuzzy numbers)\n",
+               fz.get("description", ""), "", "Fuzzy decision matrix (l; m; u):\n",
+               md_table(tfn), "", md_table(why), "",
+               "Fuzzy net flows (α-cuts), defuzzified ranking and guaranteed winner:\n",
+               md_table(fp, "{:+.3f}"), ""]
 
-    fig, axes = plt.subplots(1, 2, figsize=(11.5, 3.8), sharey=True)
-    for ax, spread in zip(axes, (0.2, 0.5)):
-        lo, hi = fz_flows[spread]
-        for i, a in enumerate(A):
-            xs = np.concatenate([lo[:, i], hi[::-1, i]])
-            ys = np.concatenate([alphas, alphas[::-1]])
-            ax.fill(xs, ys, color=color[a], alpha=0.12, lw=0)
-            ax.plot(xs, ys, color=color[a], label=pb.labels[i])
-        a_star = guaranteed_alpha(res.phi_j, pb.weights, spread, best)
-        if 0 < a_star < 1:
-            ax.axhline(a_star, color=INK, lw=1, ls=":")
-            ax.text(ax.get_xlim()[0], a_star + 0.02, f" from α = {a_star:.2f}: "
-                    f"{pb.alt_names[best]} best for all weights", fontsize=8, color=INK)
-        elif a_star == 0:
-            ax.text(ax.get_xlim()[0], 0.03, f" {pb.alt_names[best]} best for all weights in the "
-                    "whole support", fontsize=8, color=INK)
-        ax.set_xlabel("fuzzy net flow φ")
-        ax.set_title(f"fuzzy weights ±{spread:.0%}", loc="left", fontsize=10)
-    axes[0].set_ylabel("membership α")
-    axes[1].legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1))
-    fig.suptitle("Fuzzy net flows: width at height α = range of φ for weights in "
-                 "the α-cut", x=0.01, ha="left", fontweight="bold")
-    fig.tight_layout()
-    save(fig, "11_fuzzy_stability.png")
+        fig, axes = plt.subplots(1, len(cases), figsize=(5.8 * len(cases), 3.9), sharey=True,
+                                 squeeze=False)
+        axes = axes.ravel()
+        for ax, (cname, spread) in zip(axes, cases.items()):
+            lo, hi = curves[cname]
+            for i, a in enumerate(A):
+                xs = np.concatenate([lo[:, i], hi[::-1, i]])
+                ys = np.concatenate([alphas, alphas[::-1]])
+                ax.fill(xs, ys, color=color[a], alpha=0.12, lw=0)
+                ax.plot(xs, ys, color=color[a], label=pb.labels[i])
+            a_star = guaranteed_alpha(L, M, U, pb.criteria, pb.weights, spread, best)
+            if 0 < a_star < 1:
+                ax.axhline(a_star, color=INK, lw=1, ls=":")
+                ax.text(ax.get_xlim()[0], a_star + 0.02, f" from α = {a_star:.2f}: "
+                        f"{pb.alt_names[best]} best for every plausible case", fontsize=8,
+                        color=INK)
+            elif a_star == 0:
+                ax.text(ax.get_xlim()[0], 0.03, f" {pb.alt_names[best]} best in every "
+                        "plausible case", fontsize=8, color=INK)
+            ax.set_xlabel("fuzzy net flow φ")
+            ax.set_title(cname, loc="left", fontsize=10)
+        axes[0].set_ylabel("membership α")
+        axes[-1].legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1))
+        fig.suptitle("F-PROMETHEE: fuzzy net flows (width at height α = range of φ for "
+                     "all values in the α-cut)", x=0.01, ha="left", fontweight="bold")
+        fig.tight_layout()
+        save(fig, "11_f_promethee.png")
 
     # --------------------------------------------- what-if: one performance
     wi = pb.config.get("what_if")
@@ -497,7 +517,7 @@ def main(path: str):
         ax.set_title(wi.get("description", "What-if"), loc="left")
         save(fig, "08_what_if.png")
 
-    # ------------------------------------ extension: efficiency / PROMETHEE V
+    # ------------------------------------------ extension: efficiency measuring
     eff_cfg = pb.config.get("efficiency")
     if eff_cfg:
         cidx = [C.index(c) for c in eff_cfg["cost_criteria"]]
@@ -528,22 +548,22 @@ def main(path: str):
         step_df = pd.DataFrame(steps)
         if len(step_df):
             step_df = step_df.set_index("from")
-        # PROMETHEE V: best printer (max benefit flow) for every budget
+        # reading the frontier: best printer (max benefit flow) for every budget
         budgets = np.arange(eff_cfg["budget_from"], eff_cfg["budget_to"] + 1, 1.0)
         choice = budget_sweep(ben, price, budgets)
         rows, prev = [], None
         for bgt, ch in zip(budgets, choice):
             if ch != prev:
                 rows.append({"budget from [EUR]": bgt,
-                             "PROMETHEE V choice": pb.labels[ch] if ch >= 0 else "nothing affordable",
+                             "best choice": pb.labels[ch] if ch >= 0 else "nothing affordable",
                              "φ benefit": ben[ch] if ch >= 0 else np.nan})
                 prev = ch
         pv_df = pd.DataFrame(rows)
         pv_df["budget from [EUR]"] = pv_df["budget from [EUR]"].astype(int)
         pv_df = pv_df.set_index("budget from [EUR]")
-        pv_df.to_csv(OUT / "promethee_v_budget.csv")
-        pv_task1, _ = promethee_v(ben, price, 2500)
-        pv_full, _ = promethee_v(res.phi, price, 2500)
+        pv_df.to_csv(OUT / "budget_choice.csv")
+        pv_task1, _ = best_within_budget(ben, price, 2500)
+        pv_full, _ = best_within_budget(res.phi, price, 2500)
         # robustness: how often is each printer efficient under random weights
         acc = {f"efficient (±{int(s * 100)}%)": efficiency_acceptability(res.phi_j, pb.weights,
                                                                         cidx, spread=s)
@@ -553,15 +573,15 @@ def main(path: str):
         acc_df = pd.DataFrame(acc, index=pb.labels)
         acc_df.index.name = "Alternative"
         acc_df.to_csv(OUT / "efficiency_acceptability.csv")
-        md += ["## 6. Extension – efficiency analysis and PROMETHEE V\n",
+        md += ["## 6. Extension – efficiency measuring\n",
                eff_cfg.get("description", ""), "",
                "### Cost and benefit flows, efficient set\n", md_table(eff_df, "{:+.3f}"), "",
                "### Steps along the efficient frontier\n",
                md_table(step_df, "{:+.3f}") if len(step_df) else "only one efficient printer", "",
-               "### PROMETHEE V: best printer (max φ benefit, buy exactly one) for each budget\n",
+               "### Reading the frontier: best printer (max φ benefit) for each budget\n",
                md_table(pv_df, "{:+.3f}"), "",
-               f"With the Task 1 budget of 2500 EUR: PROMETHEE V on the benefit flow selects "
-               f"**{pb.labels[pv_task1[0]]}**; PROMETHEE V on the full net flow (price as a "
+               f"With the Task 1 budget of 2500 EUR: maximising the benefit flow selects "
+               f"**{pb.labels[pv_task1[0]]}**; maximising the full net flow (price as a "
                f"criterion) selects **{pb.labels[pv_full[0]]}**.\n",
                "### Robustness: share of random weight vectors for which a printer is "
                "efficient\n", md_table(acc_df, "{:.3f}"), ""]
@@ -586,11 +606,11 @@ def main(path: str):
         ax.set_xlim(price.min() * 0.85, price.max() * 1.15)
         pad = 0.25 * (ben.max() - ben.min())
         ax.set_ylim(ben.min() - pad, ben.max() + pad * 0.5)
-        ax.set_title("Efficiency: what the money buys (up-left is better; "
-                     "grey = efficient frontier)", loc="left")
+        ax.set_title("Efficient frontier: input = price, output = φ benefit "
+                     "(up-left is better)", loc="left")
         save(fig, "09_efficiency_frontier.png")
 
-        # fig: PROMETHEE V budget sweep
+        # fig: best choice for each budget
         fig, ax = plt.subplots(figsize=(7.8, 1.9))
         ax.grid(axis="y", visible=False)
         ax.set_ylim(-0.45, 0.45)
@@ -611,9 +631,9 @@ def main(path: str):
         ax.set_yticks([])
         ax.set_xlabel("budget [EUR]")
         ax.set_xlim(budgets[0], budgets[-1])
-        ax.set_title("PROMETHEE V: best printer (max φ benefit) I can buy for a given budget",
+        ax.set_title("Best printer (max φ benefit) I can buy for a given budget",
                      loc="left")
-        save(fig, "10_promethee_v_budget.png")
+        save(fig, "10_budget_choice.png")
 
     (OUT / "results.md").write_text("\n".join(md), encoding="utf-8")
     print("\n".join(md))
