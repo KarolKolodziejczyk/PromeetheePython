@@ -1,0 +1,98 @@
+"""Efficiency analysis and PROMETHEE V (own code).
+
+Efficiency (cost vs. benefit)
+-----------------------------
+The criteria are split into COST criteria (here: price) and BENEFIT criteria
+(everything the money buys).  For each alternative two PROMETHEE scores are
+computed from the unicriterion net flows phi_j:
+
+    phi_benefit(a) = sum_{j in benefit} w_j phi_j(a) / sum_{j in benefit} w_j
+    phi_cost(a)    = sum_{j in cost}    w_j phi_j(a) / sum_{j in cost}    w_j
+
+(higher = better for both; for the price, higher phi = cheaper).
+An alternative is EFFICIENT if no other alternative is at least as good on
+both scores and strictly better on one (Pareto / non-dominated).  Moving along
+the efficient frontier shows how much extra money buys how much extra benefit.
+
+PROMETHEE V (Brans & Mareschal, 1992)
+------------------------------------
+Select a subset of alternatives maximising the total net flow under linear
+constraints:
+
+    max  sum_a phi(a) x_a
+    s.t. sum_a cost(a) x_a <= budget,   min_items <= sum_a x_a <= max_items,
+         x_a in {0, 1}
+
+With few alternatives the 0-1 programme is solved exactly by enumeration.
+Here: buy exactly one printer, maximise the BENEFIT flow, price enters as the
+budget constraint -> "the best printer I can get for budget B".
+"""
+from __future__ import annotations
+
+from itertools import combinations
+
+import numpy as np
+
+from .core import normalise
+
+
+def split_flows(phi_j: np.ndarray, w, cost_idx: list[int]):
+    """Return (phi_benefit, phi_cost) for every alternative."""
+    w = normalise(w)
+    m = phi_j.shape[1]
+    cost = np.zeros(m, bool)
+    cost[list(cost_idx)] = True
+    wb, wc = np.where(cost, 0, w), np.where(cost, w, 0)
+    return phi_j @ (wb / wb.sum()), phi_j @ (wc / wc.sum())
+
+
+def efficient_set(benefit: np.ndarray, cost_score: np.ndarray) -> np.ndarray:
+    """Boolean mask of non-dominated alternatives (both scores: higher = better)."""
+    n = len(benefit)
+    eff = np.ones(n, bool)
+    for a in range(n):
+        for b in range(n):
+            if b != a and benefit[b] >= benefit[a] and cost_score[b] >= cost_score[a] \
+                    and (benefit[b] > benefit[a] or cost_score[b] > cost_score[a]):
+                eff[a] = False
+                break
+    return eff
+
+
+def promethee_v(scores: np.ndarray, costs: np.ndarray, budget: float,
+                min_items: int = 1, max_items: int = 1):
+    """Exact PROMETHEE V by enumeration. Returns (best subset tuple, total score)."""
+    n = len(scores)
+    best, best_val = (), -np.inf
+    for k in range(min_items, max_items + 1):
+        for sub in combinations(range(n), k):
+            if costs[list(sub)].sum() <= budget + 1e-9:
+                val = scores[list(sub)].sum()
+                if val > best_val + 1e-12:
+                    best, best_val = sub, val
+    return best, best_val
+
+
+def budget_sweep(scores: np.ndarray, costs: np.ndarray, budgets):
+    """PROMETHEE V choice (one item) for every budget; -1 = nothing affordable."""
+    out = []
+    for b in budgets:
+        sub, _ = promethee_v(scores, costs, b)
+        out.append(sub[0] if sub else -1)
+    return np.array(out)
+
+
+def efficiency_acceptability(phi_j: np.ndarray, w, cost_idx, n_samples: int = 20000,
+                             mode: str = "local", spread: float = 0.2, seed: int = 11):
+    """Share of random weight vectors for which each alternative is efficient."""
+    rng = np.random.default_rng(seed)
+    m = phi_j.shape[1]
+    if mode == "local":
+        W = normalise(w) * rng.uniform(1 - spread, 1 + spread, size=(n_samples, m))
+    else:
+        W = rng.dirichlet(np.ones(m), size=n_samples)
+    counts = np.zeros(phi_j.shape[0])
+    for wk in W:
+        b, c = split_flows(phi_j, wk, cost_idx)
+        counts += efficient_set(b, c)
+    return counts / n_samples

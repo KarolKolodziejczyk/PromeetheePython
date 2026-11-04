@@ -5,7 +5,7 @@ from promethee import Criterion, Problem, promethee, promethee_I, kendall_tau
 from promethee.core import PREFERENCE_FUNCTIONS
 from promethee.sensitivity import phi_with_weight, stability_intervals, monte_carlo
 from promethee.core import weighted_sum
-from promethee.sort import flowsort
+from promethee.efficiency import efficient_set, promethee_v, split_flows
 from promethee.fuzzy import extreme_linear, fuzzy_flows, robust_spread, triangular_weights
 
 
@@ -77,15 +77,20 @@ def test_wsm_reproduces_task1_spreadsheet():
     np.testing.assert_allclose(s, [0.66171, 0.85000, 0.67316, 0.58844], atol=1e-4)
 
 
-def test_flowsort_extremes():
+def test_efficiency_and_promethee_v():
     p = Problem.from_json("data/problem.json")
-    R = np.array(list(p.config["sort"]["profiles"].values()), float)
-    # an alternative equal to the ideal profile -> best class,
-    # one far worse than the limits -> below the lowest class
-    X = np.vstack([R[0], R[-1] * np.array([2, 1.5, 0.5, 0.5, 0.5, 0.5])])
-    o = flowsort(X, p.criteria, p.weights, R)
-    assert o["net"][0] == 0
-    assert o["net"][1] == len(R) - 1
+    r = promethee(p.X, p.criteria, p.weights)
+    ben, cost = split_flows(r.phi_j, p.weights, [0])
+    # benefit + cost flows recombine into the full net flow
+    w = p.weights
+    np.testing.assert_allclose(w[0] * cost + (1 - w[0]) * ben, r.phi)
+    eff = efficient_set(ben, cost)
+    assert eff[int(np.argmin(p.X[:, 0]))]          # the cheapest is always efficient
+    assert eff[int(np.argmax(ben))]                # the best-benefit one too
+    # PROMETHEE V with a budget below every price selects nothing
+    assert promethee_v(ben, p.X[:, 0], 100)[0] == ()
+    # with an unlimited budget it selects the highest benefit flow
+    assert promethee_v(ben, p.X[:, 0], 1e9)[0] == (int(np.argmax(ben)),)
 
 
 def test_kendall_tau():

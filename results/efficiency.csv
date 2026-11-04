@@ -1,0 +1,5 @@
+Alternative,Price [EUR],φ benefit (5 criteria),φ cost (price),efficient,dominated by
+A2 Snapmaker U1,899,-0.00038004535147390106,0.984,yes,–
+A1 Creality K2 Plus Combo,1187,-0.09613378684807258,0.076,no,A2
+A4 Prusa CORE One,1282,-0.24806394557823125,-0.05999999999999998,no,"A1, A2"
+A3 Bambu Lab H2D,2125,0.3445777777777777,-1.0,yes,–

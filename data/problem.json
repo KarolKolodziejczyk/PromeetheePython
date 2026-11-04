@@ -39,14 +39,10 @@
     "values_from": 700,
     "values_to": 2500
   },
-  "sort": {
-    "description": "FlowSort: assign each printer to a quality class using limiting profiles. The worst profile is the Task 1 'must pass' limits.",
-    "classes": ["Very good", "Good", "Acceptable"],
-    "profiles": {
-      "r1 ideal (best value in budget)": [800,  45, 1000, 45, 5,   4],
-      "r2 very good / good":             [1200, 50, 650,  30, 4,   2],
-      "r3 good / acceptable":            [1800, 55, 450,  20, 3.5, 1.5],
-      "r4 must-pass limits (Task 1)":    [2500, 60, 300,  14, 3,   1]
-    }
+  "efficiency": {
+    "description": "Efficiency (cost vs. benefit) and PROMETHEE V: which printers give the most for the money? Price is the cost criterion, the other five criteria are the benefit.",
+    "cost_criteria": ["C1"],
+    "budget_from": 800,
+    "budget_to": 2500
   }
 }

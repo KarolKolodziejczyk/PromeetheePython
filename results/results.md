@@ -232,54 +232,40 @@ Varying `Price [EUR]` of A3 Bambu Lab H2D (current value 2125), base weights.
 
 Winner changes at: 1096
 
-## 6. Extension – FlowSort (PROMETHEE sorting)
+## 6. Extension – efficiency analysis and PROMETHEE V
 
-FlowSort: assign each printer to a quality class using limiting profiles. The worst profile is the Task 1 'must pass' limits.
+Efficiency (cost vs. benefit) and PROMETHEE V: which printers give the most for the money? Price is the cost criterion, the other five criteria are the benefit.
 
-### Limiting profiles
+### Cost and benefit flows, efficient set
 
-| Limiting profile | Price [EUR] | Noise [dB(A)] | Max speed [mm/s] | Build volume [dm3] | Ease of use [1-5] | Nozzles [pcs] |
-|---|---|---|---|---|---|---|
-| r1 ideal (best value in budget) | 800 | 45 | 1000 | 45 | 5 | 4 |
-| r2 very good / good | 1200 | 50 | 650 | 30 | 4 | 2 |
-| r3 good / acceptable | 1800 | 55 | 450 | 20 | 3.5 | 1.5 |
-| r4 must-pass limits (Task 1) | 2500 | 60 | 300 | 14 | 3 | 1 |
-
-### Assignment with base weights
-
-| Alternative | φ (in R ∪ {a}) | class by φ | class by φ+ | class by φ− | interval (φ+, φ−) |
+| Alternative | Price [EUR] | φ benefit (5 criteria) | φ cost (price) | efficient | dominated by |
 |---|---|---|---|---|---|
-| A1 Creality K2 Plus Combo | +0.067 | Good | Good | Good | Good |
-| A2 Snapmaker U1 | +0.270 | Very good | Very good | Very good | Very good |
-| A3 Bambu Lab H2D | +0.039 | Good | Good | Good | Good |
-| A4 Prusa CORE One | -0.018 | Good | Good | Good | Good |
+| A2 Snapmaker U1 | 899 | -0.000 | +0.984 | yes | – |
+| A1 Creality K2 Plus Combo | 1187 | -0.096 | +0.076 | no | A2 |
+| A4 Prusa CORE One | 1282 | -0.248 | -0.060 | no | A1, A2 |
+| A3 Bambu Lab H2D | 2125 | +0.345 | -1.000 | yes | – |
 
-Net flows of the profiles in each sorting run:
+### Steps along the efficient frontier
 
-| flows of profiles when sorting | r1 ideal (best value in budget) | r2 very good / good | r3 good / acceptable | r4 must-pass limits (Task 1) |
+| from | to | extra price [EUR] | extra φ benefit | EUR per +0.1 φ benefit |
 |---|---|---|---|---|
-| A1 Creality K2 Plus Combo | +0.877 | +0.141 | -0.364 | -0.720 |
-| A2 Snapmaker U1 | +0.789 | +0.055 | -0.367 | -0.747 |
-| A3 Bambu Lab H2D | +0.820 | +0.168 | -0.259 | -0.768 |
-| A4 Prusa CORE One | +0.882 | +0.180 | -0.344 | -0.700 |
+| A2 Snapmaker U1 | A3 Bambu Lab H2D | 1226 | +0.345 | 355 |
 
-### Assignment under every weight scenario
+### PROMETHEE V: best printer (max φ benefit, buy exactly one) for each budget
 
-| Weights | A1 Creality K2 Plus Combo | A2 Snapmaker U1 | A3 Bambu Lab H2D | A4 Prusa CORE One |
-|---|---|---|---|---|
-| M1 points (base) | Good | Very good | Good | Good |
-| M2 rank sum | Good | Very good | Good | Good |
-| Equal (1/6 each) | Good | Good | Very good | Good |
-| 0.2 / 0.15 balanced | Good | Very good | Very good | Good |
-| Price matters less | Good | Very good | Very good | Good |
-| No multi-colour needed | Very good | Very good | Good | Good |
-| Big prints | Very good | Good | Good | Good |
+| budget from [EUR] | PROMETHEE V choice | φ benefit |
+|---|---|---|
+| 800 | nothing affordable | – |
+| 899 | A2 Snapmaker U1 | -0.000 |
+| 2125 | A3 Bambu Lab H2D | +0.345 |
 
-### Class acceptability (5 000 random weight vectors each)
+With the Task 1 budget of 2500 EUR: PROMETHEE V on the benefit flow selects **A3 Bambu Lab H2D**; PROMETHEE V on the full net flow (price as a criterion) selects **A2 Snapmaker U1**.
 
-| Alternative | Very good (±20%) | Good (±20%) | Very good (±50%) | Good (±50%) | Very good (any w) | Good (any w) | Acceptable (any w) |
-|---|---|---|---|---|---|---|---|
-| A1 Creality K2 Plus Combo | 0.000 | 1.000 | 0.030 | 0.970 | 0.300 | 0.683 | 0.017 |
-| A2 Snapmaker U1 | 1.000 | 0.000 | 0.995 | 0.005 | 0.467 | 0.533 | 0.000 |
-| A3 Bambu Lab H2D | 0.000 | 1.000 | 0.078 | 0.922 | 0.747 | 0.238 | 0.016 |
-| A4 Prusa CORE One | 0.000 | 1.000 | 0.000 | 1.000 | 0.031 | 0.934 | 0.035 |
+### Robustness: share of random weight vectors for which a printer is efficient
+
+| Alternative | efficient (±20%) | efficient (±50%) | efficient (any w) |
+|---|---|---|---|
+| A1 Creality K2 Plus Combo | 0.075 | 0.298 | 0.593 |
+| A2 Snapmaker U1 | 1.000 | 1.000 | 1.000 |
+| A3 Bambu Lab H2D | 1.000 | 0.997 | 0.931 |
+| A4 Prusa CORE One | 0.000 | 0.001 | 0.189 |

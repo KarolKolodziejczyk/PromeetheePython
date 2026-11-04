@@ -1,4 +1,4 @@
-"""Own-code PROMETHEE I/II with sensitivity analysis and FlowSort extension."""
+"""Own-code PROMETHEE I/II with sensitivity analysis and efficiency / PROMETHEE V extension."""
 from .core import (Criterion, Problem, PrometheeResult, kendall_tau, normalise,
                    preference_matrices, promethee, promethee_I, ranks_from_scores,
                    spearman_rho, unicriterion_flows, weighted_sum,

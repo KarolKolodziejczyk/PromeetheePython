@@ -1,5 +1,5 @@
 """Run the complete Task 2 analysis: PROMETHEE I/II, ranking comparison,
-sensitivity analysis, what-if analysis and FlowSort (PROMETHEE sorting) extension.
+sensitivity analysis, what-if analysis and the efficiency / PROMETHEE V extension.
 
 Usage:  python run_analysis.py [path/to/problem.json]
 
@@ -20,7 +20,8 @@ from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 
 from promethee import (Problem, kendall_tau, promethee, promethee_I,  # noqa: E402
                        ranks_from_scores, spearman_rho, weighted_sum)
-from promethee.sort import class_acceptability, flowsort  # noqa: E402
+from promethee.efficiency import (budget_sweep, efficiency_acceptability,  # noqa: E402
+                                  efficient_set, promethee_v, split_flows)
 from promethee.fuzzy import (defuzzify, fuzzy_flows, guaranteed_alpha,  # noqa: E402
                              guaranteed_margin, robust_spread)
 from promethee.sensitivity import (monte_carlo, single_threshold_sweep,  # noqa: E402
@@ -496,107 +497,123 @@ def main(path: str):
         ax.set_title(wi.get("description", "What-if"), loc="left")
         save(fig, "08_what_if.png")
 
-    # ------------------------------------------------ extension: FlowSort
-    srt = pb.config.get("sort")
-    if srt:
-        classes = srt["classes"]
-        K = len(classes)
-        R = np.array(list(srt["profiles"].values()), float)
-        pnames = list(srt["profiles"])
-        cls_names = classes + ["Below limits"]
-        prof_df = pd.DataFrame(R, index=pnames, columns=cnames)
-        prof_df.index.name = "Limiting profile"
-        rows = {}
-        detail = None
-        for name, w in scen.items():
-            o = flowsort(pb.X, pb.criteria, w, R)
-            rows[name] = [cls_names[k] for k in o["net"]]
-            if detail is None:
-                detail = o
-        sort_scen = pd.DataFrame(rows, index=pb.labels).T
-        sort_scen.index.name = "Weights"
-        sort_scen.to_csv(OUT / "flowsort_scenarios.csv")
-
-        def _interval(lo, hi):
-            lo, hi = min(lo, hi), max(lo, hi)
-            return cls_names[lo] if lo == hi else f"{cls_names[lo]} – {cls_names[hi]}"
-
-        base_sort = pd.DataFrame({
-            "φ (in R ∪ {a})": detail["phi"],
-            "class by φ": [cls_names[k] for k in detail["net"]],
-            "class by φ+": [cls_names[k] for k in detail["plus"]],
-            "class by φ−": [cls_names[k] for k in detail["minus"]],
-            "interval (φ+, φ−)": [_interval(a, b) for a, b in
-                                  zip(detail["plus"], detail["minus"])],
-        }, index=pb.labels)
-        base_sort.index.name = "Alternative"
-        base_sort.to_csv(OUT / "flowsort_base.csv")
-        acc20 = class_acceptability(pb.X, pb.criteria, pb.weights, R, spread=0.2)
-        acc50 = class_acceptability(pb.X, pb.criteria, pb.weights, R, spread=0.5)
-        accg = class_acceptability(pb.X, pb.criteria, pb.weights, R, mode="simplex")
-        acc_df = pd.DataFrame(np.hstack([acc20, acc50, accg]), index=pb.labels,
-                              columns=[f"{c} (±20%)" for c in cls_names]
-                              + [f"{c} (±50%)" for c in cls_names]
-                              + [f"{c} (any w)" for c in cls_names])
-        acc_df = acc_df.loc[:, acc_df.sum(axis=0) > 0]
+    # ------------------------------------ extension: efficiency / PROMETHEE V
+    eff_cfg = pb.config.get("efficiency")
+    if eff_cfg:
+        cidx = [C.index(c) for c in eff_cfg["cost_criteria"]]
+        bidx = [j for j in range(m) if j not in cidx]
+        price = pb.X[:, cidx[0]]
+        ben, cst = split_flows(res.phi_j, pb.weights, cidx)
+        eff = efficient_set(ben, cst)
+        # who dominates the inefficient ones
+        dom_by = []
+        for a in range(n):
+            ds = [A[b] for b in range(n) if b != a and ben[b] >= ben[a] and cst[b] >= cst[a]
+                  and (ben[b] > ben[a] or cst[b] > cst[a])]
+            dom_by.append(", ".join(ds) if ds else "–")
+        eff_df = pd.DataFrame({
+            cnames[cidx[0]]: price.round().astype(int), "φ benefit (5 criteria)": ben,
+            "φ cost (price)": cst, "efficient": np.where(eff, "yes", "no"),
+            "dominated by": dom_by}, index=pb.labels)
+        eff_df.index.name = "Alternative"
+        eff_df = eff_df.sort_values(cnames[cidx[0]])
+        eff_df.to_csv(OUT / "efficiency.csv")
+        # steps along the frontier: extra money per extra benefit
+        fr = sorted(np.where(eff)[0], key=lambda i: price[i])
+        steps = []
+        for i, k in zip(fr[:-1], fr[1:]):
+            dp, db = price[k] - price[i], ben[k] - ben[i]
+            steps.append({"from": pb.labels[i], "to": pb.labels[k], "extra price [EUR]": int(round(dp)),
+                          "extra φ benefit": db, "EUR per +0.1 φ benefit": int(round(dp / db * 0.1))})
+        step_df = pd.DataFrame(steps)
+        if len(step_df):
+            step_df = step_df.set_index("from")
+        # PROMETHEE V: best printer (max benefit flow) for every budget
+        budgets = np.arange(eff_cfg["budget_from"], eff_cfg["budget_to"] + 1, 1.0)
+        choice = budget_sweep(ben, price, budgets)
+        rows, prev = [], None
+        for bgt, ch in zip(budgets, choice):
+            if ch != prev:
+                rows.append({"budget from [EUR]": bgt,
+                             "PROMETHEE V choice": pb.labels[ch] if ch >= 0 else "nothing affordable",
+                             "φ benefit": ben[ch] if ch >= 0 else np.nan})
+                prev = ch
+        pv_df = pd.DataFrame(rows)
+        pv_df["budget from [EUR]"] = pv_df["budget from [EUR]"].astype(int)
+        pv_df = pv_df.set_index("budget from [EUR]")
+        pv_df.to_csv(OUT / "promethee_v_budget.csv")
+        pv_task1, _ = promethee_v(ben, price, 2500)
+        pv_full, _ = promethee_v(res.phi, price, 2500)
+        # robustness: how often is each printer efficient under random weights
+        acc = {f"efficient (±{int(s * 100)}%)": efficiency_acceptability(res.phi_j, pb.weights,
+                                                                        cidx, spread=s)
+               for s in (0.2, 0.5)}
+        acc["efficient (any w)"] = efficiency_acceptability(res.phi_j, pb.weights, cidx,
+                                                            mode="simplex")
+        acc_df = pd.DataFrame(acc, index=pb.labels)
         acc_df.index.name = "Alternative"
-        acc_df.to_csv(OUT / "flowsort_acceptability.csv")
-        prof_phi = pd.DataFrame(detail["profile_phi"], index=pb.labels, columns=pnames)
-        prof_phi.index.name = "flows of profiles when sorting"
-        md += ["## 6. Extension – FlowSort (PROMETHEE sorting)\n",
-               srt.get("description", ""), "", "### Limiting profiles\n",
-               md_table(prof_df, "{:g}"), "",
-               f"### Assignment with base weights\n", md_table(base_sort, "{:+.3f}"), "",
-               "Net flows of the profiles in each sorting run:\n",
-               md_table(prof_phi, "{:+.3f}"), "",
-               "### Assignment under every weight scenario\n", md_table(sort_scen), "",
-               "### Class acceptability (5 000 random weight vectors each)\n",
-               md_table(acc_df, "{:.3f}"), ""]
+        acc_df.to_csv(OUT / "efficiency_acceptability.csv")
+        md += ["## 6. Extension – efficiency analysis and PROMETHEE V\n",
+               eff_cfg.get("description", ""), "",
+               "### Cost and benefit flows, efficient set\n", md_table(eff_df, "{:+.3f}"), "",
+               "### Steps along the efficient frontier\n",
+               md_table(step_df, "{:+.3f}") if len(step_df) else "only one efficient printer", "",
+               "### PROMETHEE V: best printer (max φ benefit, buy exactly one) for each budget\n",
+               md_table(pv_df, "{:+.3f}"), "",
+               f"With the Task 1 budget of 2500 EUR: PROMETHEE V on the benefit flow selects "
+               f"**{pb.labels[pv_task1[0]]}**; PROMETHEE V on the full net flow (price as a "
+               f"criterion) selects **{pb.labels[pv_full[0]]}**.\n",
+               "### Robustness: share of random weight vectors for which a printer is "
+               "efficient\n", md_table(acc_df, "{:.3f}"), ""]
 
-        # fig: profiles vs alternative flows (base weights)
-        fig, ax = plt.subplots(figsize=(7.8, 3.4))
+        # fig: efficient frontier
+        fig, ax = plt.subplots(figsize=(7.8, 4.4))
+        order_fr = np.array(fr)
+        ax.step(np.r_[price[order_fr], price.max() * 1.08], np.r_[ben[order_fr], ben[order_fr][-1]],
+                where="post", color=AXIS, lw=1.5, zorder=1)
+        for i, a in enumerate(A):
+            ax.scatter(price[i], ben[i], s=130 if eff[i] else 90, color=color[a],
+                       edgecolor=INK if eff[i] else "white", lw=2 if eff[i] else 1.5,
+                       zorder=5, marker="o" if eff[i] else "X")
+            tag = "efficient" if eff[i] else f"dominated by {dom_by[i]}"
+            right = price[i] > np.median(price)
+            ax.annotate(f"{pb.labels[i]}\n{tag}", (price[i], ben[i]),
+                        textcoords="offset points", xytext=(-12 if right else 10, -6),
+                        ha="right" if right else "left", va="top", fontsize=8.5, color=INK)
+        ax.axhline(0, color=AXIS, lw=0.8)
+        ax.set_xlabel(f"{cnames[cidx[0]]} (cost)")
+        ax.set_ylabel("φ benefit (other criteria)")
+        ax.set_xlim(price.min() * 0.85, price.max() * 1.15)
+        pad = 0.25 * (ben.max() - ben.min())
+        ax.set_ylim(ben.min() - pad, ben.max() + pad * 0.5)
+        ax.set_title("Efficiency: what the money buys (up-left is better; "
+                     "grey = efficient frontier)", loc="left")
+        save(fig, "09_efficiency_frontier.png")
+
+        # fig: PROMETHEE V budget sweep
+        fig, ax = plt.subplots(figsize=(7.8, 1.9))
         ax.grid(axis="y", visible=False)
-        band = ["#cde2fb", "#e8f1fd", "#f7f6f3"]
-        ylab = []
-        for i in range(n):
-            pr = detail["profile_phi"][i]
-            for k in range(K):
-                ax.barh(i, pr[k] - pr[k + 1], left=pr[k + 1], height=0.62,
-                        color=band[k % 3], edgecolor="white", lw=2)
-                if i == n - 1:
-                    ax.text((pr[k] + pr[k + 1]) / 2, n - 1 + 0.42, classes[k],
-                            ha="center", va="top", fontsize=8.5, color=INK2)
-            ax.scatter(detail["phi"][i], i, s=90, color=color[A[i]], zorder=5,
-                       edgecolor="white", lw=1.5)
-            ax.text(detail["phi"][i], i + 0.36, f"{detail['phi'][i]:+.3f}", ha="center",
-                    fontsize=8, color=INK)
-            ylab.append(pb.labels[i])
-        ax.set_yticks(range(n), ylab)
-        ax.set_xlabel("net flow φ in the set {profiles} ∪ {printer}")
-        ax.set_ylim(n - 1 + 0.7, -0.5)
-        ax.set_title("FlowSort: each printer (dot) against the class bands "
-                     "(base weights)", loc="left")
-        save(fig, "09_flowsort.png")
-
-        # fig: class acceptability
-        fig, axes = plt.subplots(1, 3, figsize=(12, 2.9), sharey=True)
-        for ax, acc, ttl in zip(axes, (acc20, acc50, accg),
-                                ("±20 % around base weights", "±50 % around base weights",
-                                 "any weights (uniform simplex)")):
-            ax.grid(False)
-            ax.imshow(acc, cmap=SEQUENTIAL, vmin=0, vmax=1, aspect="auto")
-            for i in range(n):
-                for k in range(K + 1):
-                    if acc[i, k] >= 0.005:
-                        ax.text(k, i, f"{acc[i, k]:.0%}", ha="center", va="center",
-                                fontsize=8.5, color="white" if acc[i, k] > 0.5 else INK)
-            ax.set_xticks(range(K + 1), cls_names, fontsize=8)
-            ax.set_title(ttl, loc="left", fontsize=10)
-        axes[0].set_yticks(range(n), pb.labels)
-        fig.suptitle("FlowSort class acceptability: share of random weights giving "
-                     "each class", x=0.01, ha="left", fontweight="bold")
-        fig.tight_layout()
-        save(fig, "10_flowsort_acceptability.png")
+        ax.set_ylim(-0.45, 0.45)
+        seg_start = 0
+        for k in range(1, len(budgets) + 1):
+            if k == len(budgets) or choice[k] != choice[seg_start]:
+                ch = choice[seg_start]
+                if ch >= 0:
+                    ax.barh(0, budgets[k - 1] - budgets[seg_start] + 1, left=budgets[seg_start],
+                            color=color[A[ch]], height=0.5, edgecolor="white", lw=2)
+                    ax.text((budgets[seg_start] + budgets[k - 1]) / 2, 0, pb.alt_names[ch],
+                            ha="center", va="center", fontsize=8.5,
+                            color="white" if A[ch] != "A4" else INK)
+                else:
+                    ax.text((budgets[seg_start] + budgets[k - 1]) / 2, 0, "none",
+                            ha="center", va="center", fontsize=8, color=INK2)
+                seg_start = k
+        ax.set_yticks([])
+        ax.set_xlabel("budget [EUR]")
+        ax.set_xlim(budgets[0], budgets[-1])
+        ax.set_title("PROMETHEE V: best printer (max φ benefit) I can buy for a given budget",
+                     loc="left")
+        save(fig, "10_promethee_v_budget.png")
 
     (OUT / "results.md").write_text("\n".join(md), encoding="utf-8")
     print("\n".join(md))

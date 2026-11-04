@@ -10,7 +10,7 @@ not use Visual PROMETHEE. In line with the task rules, nothing from this code
 was put into VP, and no VP-specific output (e.g. the GAIA plane) was recreated.
 Because VP is not used, the sensitivity analysis is extended (Section 5:
 exact stability intervals, a stochastic Monte-Carlo analysis and a fuzzy-set
-analysis), and the chosen extension is **SORT (FlowSort)** (Section 6).
+analysis), and the chosen extension is **efficiency analysis / PROMETHEE V** (Section 6).
 
 All tables come from [`results/results.md`](results/results.md) and
 `results/*.csv`. To regenerate everything, run `python run_analysis.py`.
@@ -321,75 +321,99 @@ Both lead to the same conclusion: U1 is a robust winner.
   300 € (= p) more expensive than every other printer, so further price
   increases cannot make it any worse on price.
 
-## 6. Extension – FlowSort (PROMETHEE sorting)
+## 6. Extension – efficiency analysis and PROMETHEE V
 
-**Why SORT.**
-* There is only **one decision maker** (me), so a group analysis would be
-  artificial.
-* I buy **one printer**, so a portfolio (PROMETHEE V) would be trivial.
-* The ranking is **relative**: it only says which of these 4 printers is
-  best, not whether it is actually good.
-* Task 1 already has absolute "must pass" limits, which work naturally as the
-  lowest profile of a sorting model.
-* With FlowSort, each printer is compared only with fixed reference profiles.
-  Its class does not depend on which other printers are in the comparison.
+**Why this extension.** The goal of Task 1 was literally *"find the printer
+that gives me the most for my money"*. An efficiency analysis answers exactly
+that question: it separates **what I pay** from **what I get**.
+* Group decision-making is not useful here: there is only one decision maker.
+* Sorting would classify the printers, but it would not show the trade-off
+  between money and quality.
 
-**Model.** There are three ordered classes, *Very good*, *Good* and
-*Acceptable*, defined by four limiting profiles. Each printer is compared with
-the profiles, using the same preference functions and weights as in the
-ranking.
+### 6.1 Cost vs. benefit flows
 
-| Profile | Price | Noise | Speed | Volume | Ease | Nozzles |
-|---|---|---|---|---|---|---|
-| r1 ideal (best value I could hope for in budget) | 800 | 45 | 1000 | 45 | 5 | 4 |
-| r2 very good / good | 1200 | 50 | 650 | 30 | 4 | 2 |
-| r3 good / acceptable | 1800 | 55 | 450 | 20 | 3.5 | 1.5 |
-| r4 **must-pass limits from Task 1** | 2500 | 60 | 300 | 14 | 3 | 1 |
+The criteria are split into the **cost** criterion (price, weight 0.30) and
+the **benefit** criteria (noise, speed, volume, ease of use, nozzles, weights
+0.15 / 0.10 / 0.12 / 0.08 / 0.25, renormalised to sum to 1). From the same
+unicriterion flows φⱼ as in the ranking I compute:
 
-A printer is assigned to class Cₖ if φ(rₖ) ≥ φ(a) > φ(rₖ₊₁). The flows are
-computed on the set {r1, …, r4, a}. The φ+ and φ− assignments are also
-checked; when they differ, the printer belongs to an interval of classes.
+* **φ benefit** = weighted average of φⱼ over the 5 benefit criteria
+  (what the printer offers),
+* **φ cost** = φ of the price criterion (higher = cheaper).
 
-![flowsort](results/figures/09_flowsort.png)
+Together they give back the full net flow: φ = 0.30·φ cost + 0.70·φ benefit.
 
-| Printer | φ (vs profiles) | Class (φ) | Class (φ+) | Class (φ−) |
+A printer is **efficient** if no other printer is at least as good on both
+scores and strictly better on one (Pareto, non-dominated).
+
+![efficiency frontier](results/figures/09_efficiency_frontier.png)
+
+| Printer | Price | φ benefit | φ cost | Efficient? |
 |---|---|---|---|---|
-| A2 Snapmaker U1 | +0.270 | **Very good** | Very good | Very good |
-| A1 Creality K2 Plus Combo | +0.067 | Good | Good | Good |
-| A3 Bambu Lab H2D | +0.039 | Good | Good | Good |
-| A4 Prusa CORE One | −0.018 | Good | Good | Good |
+| A2 Snapmaker U1 | 899 € | 0.000 | +0.984 | **yes**, the cheapest |
+| A1 Creality K2 Plus | 1187 € | −0.096 | +0.076 | no, dominated by U1 |
+| A4 Prusa CORE One | 1282 € | −0.248 | −0.060 | no, dominated by U1 and K2 Plus |
+| A3 Bambu Lab H2D | 2125 € | **+0.345** | −1.000 | **yes**, the best |
 
-* **Only the Snapmaker U1 reaches "Very good"** with my weights. The other
-  three are "Good".
-* **No printer is only "Acceptable" or below the limits.** This matches the
-  Task 1 check that all four printers are within my limits, and the margin is
-  large. Even the CORE One (φ = −0.018) is far above the good/acceptable
-  boundary (φ ≈ −0.34).
-* **The φ+ and φ− assignments agree in every case.** No assignment is
-  imprecise.
+* **Only two printers are efficient: U1 and H2D.** For every other printer
+  there is one that is both cheaper and better.
+* **K2 Plus and CORE One are dominated by U1.** U1 is cheaper (by 288 € and
+  383 €) and offers more on the benefit criteria. With the efficiency
+  analysis they can be excluded without even discussing weights between cost
+  and benefit.
+* **The only real trade-off is U1 → H2D:** +1226 € buys +0.345 φ benefit,
+  about **355 € for every +0.1 of benefit flow**. H2D is quieter, twice as
+  fast, has a larger volume and is the easiest to use, but has 2 nozzles
+  instead of 4.
 
-**Sorting under different weights and robustness**
+### 6.2 PROMETHEE V – best printer for a given budget
 
-| Weights | K2 Plus | U1 | H2D | CORE One |
-|---|---|---|---|---|
-| M1 / M2 | Good | **Very good** | Good | Good |
-| Equal | Good | Good | **Very good** | Good |
-| 0.2 / 0.15, Price matters less | Good | **Very good** | **Very good** | Good |
-| No multi-colour needed | **Very good** | **Very good** | Good | Good |
-| Big prints | **Very good** | Good | Good | Good |
+PROMETHEE V selects alternatives that maximise the total net flow under
+linear constraints. Here the 0-1 programme is:
 
-![flowsort acceptability](results/figures/10_flowsort_acceptability.png)
+  max Σ φ benefit(a) · xₐ   s.t.   Σ price(a) · xₐ ≤ budget,   Σ xₐ = 1,   xₐ ∈ {0, 1}
 
-* **The assignment is robust.** With ±20 % weight uncertainty, the classes
-  above never change (100 %). With ±50 % uncertainty, U1 stays "Very good"
-  in 99.5 % of samples.
-* **For any random weights, H2D is "Very good" most often (75 %).** This is
-  the same conclusion as Section 5.2: it is the strongest machine overall,
-  but not the best fit for my priorities.
-* **The CORE One is "Very good" in only 3 % of random weight vectors.**
-* Under "0.2 / 0.15 balanced" and "Price matters less", **both U1 and H2D are
-  "Very good"**. This shows something a ranking cannot: in those scenarios
-  both printers are genuinely excellent buys, not just "1st and 2nd".
+In words: buy exactly one printer, the one with the most benefit that I can
+afford. With 4 printers it is solved exactly by enumeration.
+
+![PROMETHEE V budget](results/figures/10_promethee_v_budget.png)
+
+| Budget | PROMETHEE V choice |
+|---|---|
+| below 899 € | nothing affordable |
+| 899 – 2124 € | **Snapmaker U1** |
+| from 2125 € | **Bambu Lab H2D** |
+
+* A budget between 899 € and 2124 € never buys anything better than U1. K2
+  Plus and CORE One are never chosen, at any budget. This confirms that they
+  are dominated.
+* **With my budget of 2500 €:**
+  * If price is *only a constraint*, PROMETHEE V on the benefit flow picks
+    H2D.
+  * If price is also a *criterion* (weight 0.30, as in my problem),
+    PROMETHEE V on the full net flow picks **U1**.
+
+  The difference is exactly the question "do I want the best printer I can
+  afford, or the best value for money?". My goal in Task 1 was value for
+  money, so U1 is my choice.
+
+### 6.3 Robustness of the efficient set
+
+Share of random weight vectors (20 000) for which each printer is efficient:
+
+| Printer | ±20 % | ±50 % | any weights |
+|---|---|---|---|
+| A2 Snapmaker U1 | **100 %** | **100 %** | **100 %** |
+| A3 Bambu Lab H2D | **100 %** | **99.7 %** | 93 % |
+| A1 Creality K2 Plus | 8 % | 30 % | 59 % |
+| A4 Prusa CORE One | 0 % | 0.1 % | 19 % |
+
+* **U1 is always efficient**, because it is the cheapest printer.
+* **H2D is efficient in almost every case**, because it offers the most.
+* **K2 Plus becomes efficient only when** the benefit weights shift toward
+  build volume.
+* **CORE One is practically never efficient**, so it is the weakest choice
+  for my money.
 
 ## 7. Conclusions
 
@@ -397,7 +421,8 @@ checked; when they differ, the printer belongs to an interval of classes.
    * It is first in PROMETHEE II with both Task 1 weighting methods, with a
      large margin (φ = +0.295, the only positive net flow).
    * It outranks all three other printers in PROMETHEE I.
-   * It is the only printer sorted as "Very good".
+   * It is efficient (the cheapest printer on the efficient frontier) and
+     dominates K2 Plus and CORE One: they are more expensive *and* offer less.
    * It stays first for ±20 % weight uncertainty (100 %), ±50 % (97 %), and
      every threshold variant.
    * The fuzzy-set analysis guarantees that it is best for every weight
@@ -409,19 +434,20 @@ checked; when they differ, the printer belongs to an interval of classes.
    slowest) are on criteria with lower weights.
 3. **Bambu H2D is the objectively strongest printer.** It wins with equal
    weights, when price matters less, and in 62 % of random weight vectors.
+   It is the only other efficient printer: the best printer I can buy if I
+   am willing to pay 1226 € more.
    It loses only because of its price, and it would become my best choice
    below about 1096 €. This is where PROMETHEE differs most from the Task 1
    WSM, which said H2D never wins.
 4. **Creality K2 Plus is the choice if I want big prints.** Without
    multi-colour it is practically tied with U1 (in both PROMETHEE and WSM).
-5. **Prusa CORE One is consistently last.** It is a good printer (it is in
-   the "Good" class), but it is dominated by the others for my needs.
+5. **Prusa CORE One is consistently last.** In the efficiency analysis it is
+   dominated by both U1 and K2 Plus, which are cheaper and offer more.
 6. **Weak points of the analysis:**
    * As already noted in Task 1: only 4 printers, noise values from different
      sources (handled here with q = 2 dB), and ease of use is a subjective
      score.
-   * New in PROMETHEE: the preference thresholds and the FlowSort profiles
-     are also my own judgement. The threshold analysis shows they do not
+   * New in PROMETHEE: the preference thresholds are also my own judgement. The threshold analysis shows they do not
      affect the winner, but they do affect places 2 and 3.
 
 ---

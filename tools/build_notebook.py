@@ -20,7 +20,7 @@ BRANCH = "claude/wizardly-edison-vn4pzz"
 NB = "PROMETHEE_Colab.ipynb"
 
 EMBED = ["promethee/__init__.py", "promethee/core.py", "promethee/sensitivity.py",
-         "promethee/sort.py", "promethee/fuzzy.py", "run_analysis.py", "data/problem.json"]
+         "promethee/efficiency.py", "promethee/fuzzy.py", "run_analysis.py", "data/problem.json"]
 
 
 def md(text: str) -> dict:
@@ -61,7 +61,7 @@ Own Python implementation of **PROMETHEE I / II** (no Visual PROMETHEE) for the 
 
 * comparison with the Task 1 WSM (P × W) under 7 weight configurations,
 * extended sensitivity analysis (exact weight stability intervals, Monte-Carlo, thresholds, H2D price what-if),
-* the **FlowSort** (PROMETHEE SORT) extension.
+* the **efficiency analysis / PROMETHEE V** extension.
 
 **How to use:** `Runtime → Run all`. The notebook is self-contained – it writes the code files itself,
 so no repository access is needed. To change the data or weights, edit the `data/problem.json` cell
@@ -72,7 +72,8 @@ so no repository access is needed. To change the data or weights, edit the `data
 Tu tylko **zapisuję pliki z kodem**, nic się jeszcze nie liczy.
 - `core.py`: sama metoda PROMETHEE (funkcje preferencji → π(a,b) → φ⁺, φ⁻, φ) i WSM z Task 1
 - `sensitivity.py`: analiza wrażliwości (wagi, Monte Carlo, progi)
-- `sort.py`: rozszerzenie FlowSort (sortowanie do klas)
+- `efficiency.py`: rozszerzenie Efficiency / PROMETHEE V (co dostaję za swoje pieniądze)
+- `fuzzy.py`: stabilność przez zbiory rozmyte
 - `run_analysis.py`: odpala wszystko po kolei i zapisuje tabele/wykresy do `results/`
 """),
     code("import os\nos.makedirs('promethee', exist_ok=True)\nos.makedirs('data', exist_ok=True)"),
@@ -93,9 +94,12 @@ Wrażliwość. Trik: **φ = Σ w_j·φ_j** (φ jest liniowe w wagach), więc:
 - `monte_carlo`: losuje 20 000 zestawów wag i patrzy, jak często która drukarka jest 1., 2., …
 - `threshold_sensitivity`: zmienia progi q, p i sprawdza, czy ranking się trzyma
 """,
-    "promethee/sort.py": """
-FlowSort: każdą drukarkę porównuję **z profilami granicznymi** (nie z innymi drukarkami),
-liczę zwykłe PROMETHEE na zbiorze {profile + ta drukarka} i patrzę, między którymi profilami wypada jej φ → klasa.
+    "promethee/efficiency.py": """
+Rozszerzenie **Efficiency / PROMETHEE V**:
+- `split_flows`: dzieli przepływ na **φ korzyści** (5 kryteriów bez ceny) i **φ kosztu** (cena)
+- `efficient_set`: drukarka jest **efektywna**, jeśli żadna inna nie jest jednocześnie lepsza i tańsza
+- `promethee_v`: PROMETHEE V = wybierz drukarki o max sumie φ przy ograniczeniach (budżet, liczba sztuk), tu: kup 1 drukarkę
+- `budget_sweep`: najlepsza drukarka dla każdego budżetu
 """,
     "promethee/fuzzy.py": """
 Stabilność przez **zbiory rozmyte (fuzzy sets)**: każda waga to liczba trójkątna (w·(1−s), w, w·(1+s)).
@@ -105,7 +109,7 @@ Dla każdego poziomu α liczę **najmniejsze i największe φ** po wszystkich wa
 """,
     "run_analysis.py": """
 Skrypt „dyrygent”: wczytuje JSON, woła funkcje z `promethee/` sekcja po sekcji
-(ranking → porównanie z WSM → wrażliwość → what-if H2D → FlowSort) i zapisuje wyniki.
+(ranking → porównanie z WSM → wrażliwość → fuzzy → what-if H2D → efficiency) i zapisuje wyniki.
 """,
 }
 for rel in EMBED:
@@ -115,7 +119,7 @@ for rel in EMBED:
 ## 1. Problem data – **edit here**
 
 Printers, criteria (direction, preference function, thresholds q / p / s), weights,
-weight scenarios, the what-if setup and the FlowSort profiles.
+weight scenarios, the what-if setup and the efficiency settings.
 Preference functions: `usual`, `u-shape` (q), `v-shape` (p), `level` (q, p), `linear` (q, p), `gaussian` (s).
 """))
         cells.append(note("""
@@ -139,7 +143,7 @@ Wagi bazowe = metoda 1 z Task 1 (punkty): 0.30 / 0.15 / 0.10 / 0.12 / 0.08 / 0.2
 
 cells += [
     md("## 2. Run the analysis"),
-    note("Jedna komenda liczy wszystko (ranking, porównanie, wrażliwość, FlowSort). Wyniki → folder `results/`."),
+    note("Jedna komenda liczy wszystko (ranking, porównanie, wrażliwość, fuzzy, efficiency). Wyniki → folder `results/`."),
     code("!python run_analysis.py > /dev/null && echo 'done – results in results/'"),
     code("import pandas as pd\nfrom IPython.display import Markdown, Image, display\n"
          "pd.set_option('display.width', 200)"),
@@ -224,18 +228,29 @@ Kontynuacja sekcji 6 z Task 1: H2D wygrywa, jeśli kosztuje **< ok. 1096 €** (
 WSM w Task 1 mówił, że H2D nie wygrywa nawet przy cenie U1, więc tu PROMETHEE daje inny wniosek.
 Powyżej ~1580 € linia H2D jest płaska: różnica ceny > p = 300 €, więc preferencja i tak = 1.
 """),
-    md("## 6. Extension – FlowSort (PROMETHEE SORT)"),
+    md("## 6. Extension – Efficiency analysis and PROMETHEE V"),
     note("""
-**Dlaczego SORT:** jeden decydent (więc nie grupowa), kupuję jedną drukarkę (więc nie portfolio).
-Ranking mówi tylko „kto lepszy od kogo”, FlowSort mówi, **czy drukarka jest naprawdę dobra**.
-Klasy Very good / Good / Acceptable wyznaczają 4 profile; najniższy = limity „must pass” z Task 1.
+**Dlaczego Efficiency:** cel z Task 1 to *„find the printer that gives me the most for my money”*.
+Dzielę kryteria na **koszt** (cena) i **korzyści** (hałas, prędkość, objętość, łatwość, dysze).
+Dla każdej drukarki liczę **φ korzyści** i **φ kosztu** (z tych samych przepływów co w rankingu).
+**Efektywna** = żadna inna nie jest jednocześnie lepsza i tańsza.
 """),
-    show("Assignment with base weights", "09_flowsort.png", "flowsort_base.csv"),
-    note("Tylko **U1 = Very good**, reszta Good. Żadna nie jest blisko limitów (zgodne z Task 1: wszystkie „within limits”)."),
-    show("Assignment under every weight scenario", csv="flowsort_scenarios.csv"),
-    show("Class acceptability under random weights", "10_flowsort_acceptability.png",
-         "flowsort_acceptability.csv"),
-    note("Przy ±20% wag klasy się nie zmieniają (100%). Prusa prawie nigdy nie jest Very good."),
+    show("Cost vs. benefit and the efficient set", "09_efficiency_frontier.png", "efficiency.csv"),
+    note("""
+Efektywne są tylko **U1** (najtańsza, 899 €) i **H2D** (najlepsza, φ korzyści +0.345).
+**K2 Plus i Prusa są zdominowane:** U1 jest od nich tańsza i jednocześnie lepsza na pozostałych kryteriach.
+Przejście U1 → H2D: **+1226 €** za **+0.345** φ korzyści (ok. 355 € za każde +0.1).
+"""),
+    show("PROMETHEE V – best printer for each budget", "10_promethee_v_budget.png",
+         "promethee_v_budget.csv"),
+    note("""
+**PROMETHEE V:** wybierz drukarkę o największym φ korzyści, której cena ≤ budżet (kupuję dokładnie 1).
+Budżet 899–2124 € → **U1**; od 2125 € → **H2D**.
+Przy budżecie 2500 € i **samych korzyściach** wygrałaby H2D. Ale cena jest dla mnie kryterium (waga 0.30), nie tylko limitem,
+więc z pełnym φ (cena + korzyści) PROMETHEE V wybiera **U1**, tak jak ranking.
+"""),
+    show("Robustness – how often is a printer efficient under random weights", csv="efficiency_acceptability.csv"),
+    note("U1 i H2D są efektywne prawie zawsze (U1 zawsze, bo jest najtańsza). Prusa prawie nigdy, więc to najsłabszy wybór."),
     md("## 7. Full auto-generated results (markdown) and download"),
     code("display(Markdown(open('results/results.md', encoding='utf-8').read()))"),
     code("# optional: download all tables and figures as a zip\n"

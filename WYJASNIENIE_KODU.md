@@ -13,7 +13,8 @@ data/problem.json          ← dane z Task 1 + parametry PROMETHEE
         ▼
 promethee/core.py          ← funkcje preferencji, PROMETHEE I i II, WSM (P×W)
 promethee/sensitivity.py   ← analiza wrażliwości (wagi, Monte Carlo, progi)
-promethee/sort.py          ← rozszerzenie: FlowSort (sortowanie do klas)
+promethee/fuzzy.py         ← stabilność przez zbiory rozmyte (fuzzy)
+promethee/efficiency.py    ← rozszerzenie: Efficiency / PROMETHEE V
         │
         ▼
 run_analysis.py            ← uruchamia wszystko po kolei, zapisuje tabele i wykresy
@@ -45,7 +46,7 @@ REPORT.md (interpretacja)    PROMETHEE_Colab.ipynb (to samo w Colabie)
 | `weight_scenarios` | 7 zestawów wag do porównania: M1, M2 (rank sum), równe, 0.2/0.15 i 3 scenariusze z Task 1 |
 | `weighted_sum_normalisation` | `"ratio"`: normalizacja taka jak w arkuszu z Task 1 (min/x oraz x/max) |
 | `what_if` | analiza „co jeśli H2D będzie tańszy” (kontynuacja sekcji 6 z Task 1) |
-| `sort` | klasy i 4 profile graniczne dla FlowSort. Ostatni profil to limity „must pass” z Task 1 |
+| `efficiency` | które kryterium jest kosztem (cena) i zakres budżetów dla PROMETHEE V |
 
 ---
 
@@ -99,7 +100,7 @@ Przechowuje opis jednego kryterium. Metoda `preference(d)` robi dwie rzeczy:
   * listę obiektów `Criterion`,
   * wagi znormalizowane do sumy 1 (funkcja `normalise`).
 * Pełny JSON zostaje zapamiętany w `config`, żeby później odczytać z niego
-  sekcje `sort` i `what_if`.
+  sekcje `efficiency` i `what_if`.
 
 ### 2.4 `preference_matrices` (linie 128–136) – krok 1 PROMETHEE
 
@@ -302,44 +303,59 @@ Testy:
 
 ---
 
-## 4. `promethee/sort.py` – rozszerzenie FlowSort
+## 4. `promethee/efficiency.py` – rozszerzenie Efficiency / PROMETHEE V
 
-FlowSort (Nemery & Lamboray, 2008):
-* Klasy C₁ (najlepsza), …, C_K są ograniczone profilami r₁, …, r_{K+1}.
-* My mamy 3 klasy i 4 profile. Profil r₄ to limity „must pass” z Task 1.
+Cel z Task 1: *„find the printer that gives me the most for my money”*. Ta
+analiza oddziela **to, co płacę** od **tego, co dostaję**.
 
-### 4.1 `check_profiles` (linie 26–33)
+### 4.1 `split_flows` – φ korzyści i φ kosztu
 
-Sprawdza, że profile są uporządkowane: każdy kolejny jest nie lepszy od
-poprzedniego na każdym kryterium. Bez tego klasy nie miałyby sensu.
+Bierze przepływy jednokryterialne φⱼ (te same co w rankingu) i dzieli je na
+dwie grupy:
+* **φ kosztu** = φ kryterium ceny (wyżej = taniej);
+* **φ korzyści** = średnia ważona φⱼ z 5 pozostałych kryteriów. Wagi
+  0.15 / 0.10 / 0.12 / 0.08 / 0.25 są przeskalowane tak, żeby sumowały się do 1.
 
-### 4.2 `flowsort` (linie 50–72)
+Sprawdzenie: 0.30 · φ kosztu + 0.70 · φ korzyści = zwykłe φ z rankingu
+(test `test_efficiency_and_promethee_v`).
 
-Dla każdej drukarki a osobno:
-1. Buduje zbiór {r₁, r₂, r₃, r₄, a}: 4 profile i jedna drukarka.
-2. Liczy na nim zwykłe PROMETHEE (`promethee`), z tymi samymi funkcjami
-   preferencji i wagami co w rankingu.
-3. Przypisuje drukarkę do klasy Cₖ, jeśli φ(rₖ) ≥ φ(a) > φ(rₖ₊₁)
-   (`_class_index`).
-4. Robi to samo osobno dla φ⁺ i φ⁻. Jeśli te dwa przypisania się różnią,
-   przypisanie jest „przedziałowe”. U nas zawsze się zgadzają.
+### 4.2 `efficient_set` – kto jest efektywny
 
-Najważniejsza zaleta: drukarkę porównujemy **tylko z profilami**, nie z
-innymi drukarkami. Jej klasa nie zmieni się, jeśli dodamy piątą drukarkę.
-Ranking takiej gwarancji nie daje.
+Drukarka jest **efektywna** (niezdominowana, Pareto), jeśli **żadna inna nie
+jest jednocześnie lepsza i tańsza**. Kod sprawdza każdą parę: jeśli b ma φ
+korzyści i φ kosztu nie gorsze od a, a w jednym z nich jest lepsza, to a jest
+zdominowana.
 
-### 4.3 `_class_index` (linie 36–47)
+Wynik:
+* efektywne są tylko U1 (najtańsza) i H2D (najlepsza);
+* K2 Plus i Prusa są zdominowane przez U1.
 
-Przechodzi przez klasy od najlepszej i zwraca pierwszą, której dolna granica
-jest przekroczona.
-* `sign` pozwala tej samej funkcji obsłużyć φ⁻, gdzie mniej znaczy lepiej.
-* Wynik K oznacza „poniżej limitów”, czyli drukarka nieakceptowalna.
+### 4.3 `promethee_v` – PROMETHEE V
 
-### 4.4 `class_acceptability` (linie 75–93)
+PROMETHEE V (Brans & Mareschal, 1992) wybiera **zbiór** alternatyw o
+największej sumie φ przy ograniczeniach liniowych. Formalnie to zadanie
+programowania 0-1 (xₐ = 1 oznacza „biorę”):
 
-Działa jak Monte Carlo z punktu 3.4, tylko zamiast pozycji w rankingu
-zliczamy klasy. Wynik: U1 jest „Very good” w 100 % losowań przy ±20 % i w
-99.5 % przy ±50 %.
+  max Σ φ(a)·xₐ   przy   Σ cena(a)·xₐ ≤ budżet,   min ≤ Σ xₐ ≤ max
+
+U nas kupuję dokładnie jedną drukarkę (min = max = 1). Przy 4 drukarkach
+kod po prostu sprawdza wszystkie możliwości (`itertools.combinations`).
+Wynik jest dokładny.
+
+### 4.4 `budget_sweep` – najlepsza drukarka dla każdego budżetu
+
+Uruchamia PROMETHEE V dla budżetów od 800 do 2500 € co 1 € i zapamiętuje
+wybór:
+* 899–2124 € → U1,
+* od 2125 € → H2D.
+
+### 4.5 `efficiency_acceptability` – odporność
+
+Losuje 20 000 zestawów wag (jak Monte Carlo z punktu 3.4) i liczy, jak często
+każda drukarka jest efektywna:
+* U1: 100 % (zawsze, bo jest najtańsza),
+* H2D: prawie 100 %,
+* Prusa: prawie nigdy.
 
 ---
 
@@ -356,7 +372,8 @@ i fragment `results.md`.
 | `sensitivity: weights` | przedziały stabilności, wykresy wag, Monte Carlo | `weight_stability_intervals.csv`, `05_…`, `06_…` |
 | `sensitivity: thresholds` | skalowanie progów i wariant „usual” | `threshold_sensitivity.csv`, `07_…` |
 | `what-if` | cena H2D od 700 do 2500 € w 361 krokach; punkt zmiany zwycięzcy liczony interpolacją liniową (≈ 1096 €) | `what_if.csv`, `08_…` |
-| `FlowSort` | klasy przy wagach bazowych i wszystkich scenariuszach, akceptowalność klas | `flowsort_*.csv`, `09_…`, `10_…` |
+| `fuzzy` | rozmyte przepływy dla wag ±20 % i ±50 %, pewny zwycięzca | `fuzzy_stability.csv`, `11_…` |
+| `efficiency / PROMETHEE V` | φ korzyści i kosztu, zbiór efektywny, wybór dla każdego budżetu, odporność | `efficiency*.csv`, `promethee_v_budget.csv`, `09_…`, `10_…` |
 
 Funkcje pomocnicze:
 * `md_table` zamienia tabelę pandas na tabelę Markdown;
@@ -379,7 +396,7 @@ Uruchomienie: `python run_analysis.py` (domyślnie `data/problem.json`) albo
 | `test_stability_intervals_are_exact` | ranking jest stały wewnątrz przedziału, a zmienia się tuż za granicą |
 | `test_monte_carlo_rows_sum_to_one` | macierz akceptowalności jest poprawna: wiersze i kolumny sumują się do 1 |
 | `test_wsm_reproduces_task1_spreadsheet` | WSM daje dokładnie wyniki z arkusza Task 1 |
-| `test_flowsort_extremes` | drukarka równa profilowi idealnemu trafia do najlepszej klasy, a dużo gorsza od limitów do „poniżej limitów” |
+| `test_efficiency_and_promethee_v` | φ korzyści i kosztu składają się na φ; najtańsza i najlepsza są efektywne; PROMETHEE V przy zerowym budżecie nic nie wybiera, a bez limitu wybiera najlepszą |
 | `test_kendall_tau` | τ = 1 dla identycznych i −1 dla odwróconych rankingów |
 
 Uruchomienie: `python -m pytest -q`.
@@ -401,7 +418,7 @@ Uruchomienie: `python -m pytest -q`.
 
 **Dlaczego własny kod, a nie Visual PROMETHEE?**
 Zadanie pozwala na jedno albo drugie. Własny kod pozwala zrobić analizy,
-których VP nie ma: dokładne przedziały stabilności, Monte Carlo, FlowSort i
+których VP nie ma: dokładne przedziały stabilności, Monte Carlo, fuzzy, efficiency z PROMETHEE V i
 analizę ceny H2D. Zgodnie z instrukcją nie odtwarzam wyników VP, w tym
 płaszczyzny GAIA.
 
@@ -438,13 +455,21 @@ Przepływ netto jest liniowy względem wag, więc każda para alternatyw zmienia
 kolejność w dokładnie jednym punkcie, który da się wyliczyć wzorem. Nie
 trzeba przeszukiwać siatki wartości.
 
-**Dlaczego rozszerzenie SORT?**
+**Dlaczego rozszerzenie Efficiency / PROMETHEE V?**
+* Cel z Task 1 to dosłownie *„the printer that gives me the most for my
+  money”*, a analiza efektywności odpowiada dokładnie na to pytanie.
+* Pokazuje, że K2 Plus i Prusa są zdominowane: U1 jest od nich tańsza i
+  lepsza.
+* Pokazuje, że jedyny prawdziwy wybór to „U1 albo dopłacić 1226 € do H2D”.
 * Jest jeden decydent, więc decyzja grupowa nie ma sensu.
-* Kupujesz jedną drukarkę, więc PROMETHEE V (portfel) jest trywialny.
-* Task 1 ma limity „must pass”, które są naturalnym dolnym profilem.
-* FlowSort daje ocenę bezwzględną („czy ta drukarka jest naprawdę dobra?”),
-  niezależną od liczby porównywanych drukarek. To odpowiada na słaby punkt z
-  Task 1: tylko 4 drukarki.
+
+**Jaka jest różnica między PROMETHEE V a zwykłym rankingiem?**
+* Ranking porządkuje drukarki.
+* PROMETHEE V **wybiera** najlepszą drukarkę **przy ograniczeniu budżetu**.
+  * Przy 2500 € i samych korzyściach wybrałby H2D, czyli najlepszą drukarkę,
+    na jaką mnie stać.
+  * Gdy cena jest też kryterium, wybiera U1, czyli najlepszy stosunek jakości
+    do ceny.
 
 **Stochastycznie czy fuzzy?**
 Zrobiłem oba podejścia:
