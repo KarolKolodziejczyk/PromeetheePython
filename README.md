@@ -5,7 +5,7 @@ applied to the Task 1 problem **"Which 3D printer should I buy?"** (4 FDM printe
 6 criteria, data from `KK_MCDM_1.xlsx`), with comparison against the Task 1 WSM,
 extended sensitivity analysis and the **FlowSort** (PROMETHEE SORT) extension.
 
-**Read the analysis and interpretation in [`REPORT.md`](REPORT.md).**
+**Read the analysis and interpretation in [`REPORT.md`](REPORT.md).** Code walkthrough (PL): [`WYJASNIENIE_KODU.md`](WYJASNIENIE_KODU.md).
 
 ## Run in Google Colab
 
