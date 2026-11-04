@@ -1,0 +1,43 @@
+{
+  "title": "Selection of an electric car for a family",
+  "alternatives": {
+    "A1": "City Compact",
+    "A2": "Family Hatch",
+    "A3": "Budget Crossover",
+    "A4": "Premium Sedan",
+    "A5": "Mid-size SUV",
+    "A6": "Long-range Estate"
+  },
+  "criteria": [
+    {"id": "C1", "name": "Price [kPLN]",           "direction": "min", "function": "linear", "q": 5,  "p": 40},
+    {"id": "C2", "name": "Range WLTP [km]",        "direction": "max", "function": "linear", "q": 20, "p": 120},
+    {"id": "C3", "name": "Charging 10-80% [min]",  "direction": "min", "function": "v-shape",        "p": 20},
+    {"id": "C4", "name": "Boot capacity [l]",      "direction": "max", "function": "level",  "q": 50, "p": 150},
+    {"id": "C5", "name": "Safety & equipment [1-10]", "direction": "max", "function": "usual"}
+  ],
+  "performance": {
+    "A1": [140, 320, 35, 300, 6],
+    "A2": [185, 420, 30, 385, 8],
+    "A3": [150, 380, 45, 450, 6],
+    "A4": [260, 560, 22, 470, 9],
+    "A5": [215, 480, 28, 520, 8],
+    "A6": [230, 600, 25, 580, 7]
+  },
+  "weights": [0.30, 0.25, 0.15, 0.15, 0.15],
+  "weight_scenarios": {
+    "Base":           [0.30, 0.25, 0.15, 0.15, 0.15],
+    "Equal (0.2 each)": [0.20, 0.20, 0.20, 0.20, 0.20],
+    "Cost-oriented":  [0.50, 0.15, 0.10, 0.10, 0.15],
+    "Travel-oriented":[0.15, 0.40, 0.25, 0.10, 0.10],
+    "Practicality":   [0.15, 0.15, 0.10, 0.35, 0.25],
+    "Safety-first":   [0.20, 0.15, 0.10, 0.15, 0.40]
+  },
+  "group": {
+    "description": "Three family members decide together; each has their own weights, the group aggregates net flows with decision-maker importance weights (PROMETHEE GDSS).",
+    "decision_makers": {
+      "DM1 Parent (budget holder)": {"importance": 0.40, "weights": [0.45, 0.15, 0.10, 0.15, 0.15]},
+      "DM2 Commuter":               {"importance": 0.35, "weights": [0.15, 0.40, 0.25, 0.05, 0.15]},
+      "DM3 Second parent (safety)": {"importance": 0.25, "weights": [0.20, 0.10, 0.05, 0.25, 0.40]}
+    }
+  }
+}

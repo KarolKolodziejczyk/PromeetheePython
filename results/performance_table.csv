@@ -1,0 +1,7 @@
+Alternative,Price [kPLN],Range WLTP [km],Charging 10-80% [min],Boot capacity [l],Safety & equipment [1-10]
+A1 City Compact,140.0,320.0,35.0,300.0,6.0
+A2 Family Hatch,185.0,420.0,30.0,385.0,8.0
+A3 Budget Crossover,150.0,380.0,45.0,450.0,6.0
+A4 Premium Sedan,260.0,560.0,22.0,470.0,9.0
+A5 Mid-size SUV,215.0,480.0,28.0,520.0,8.0
+A6 Long-range Estate,230.0,600.0,25.0,580.0,7.0

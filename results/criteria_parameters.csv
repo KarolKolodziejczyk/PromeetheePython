@@ -1,0 +1,6 @@
+id,criterion,direction,function,q,p,s,weight
+C1,Price [kPLN],min,linear,5.0,40.0,0.0,0.3
+C2,Range WLTP [km],max,linear,20.0,120.0,0.0,0.25
+C3,Charging 10-80% [min],min,v-shape,0.0,20.0,0.0,0.15
+C4,Boot capacity [l],max,level,50.0,150.0,0.0,0.15
+C5,Safety & equipment [1-10],max,usual,0.0,0.0,0.0,0.15
