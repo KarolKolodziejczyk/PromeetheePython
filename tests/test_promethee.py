@@ -6,8 +6,7 @@ from promethee.core import PREFERENCE_FUNCTIONS
 from promethee.sensitivity import phi_with_weight, stability_intervals, monte_carlo
 from promethee.core import weighted_sum
 from promethee.efficiency import best_within_budget, efficient_set, split_flows
-from promethee.fuzzy import (extreme_linear, fuzzy_matrix, fuzzy_net_flows, guaranteed_margin,
-                             triangular_weights)
+from promethee.fuzzy import fuzzy_matrix, fuzzy_promethee
 
 
 def test_preference_functions_shapes():
@@ -105,38 +104,32 @@ def _fuzzy_problem():
     return p, L, M, U
 
 
-def test_f_promethee_alpha1_is_crisp():
+def test_f_promethee_middle_is_crisp_and_triangles_are_ordered():
     p, L, M, U = _fuzzy_problem()
-    lo, hi = fuzzy_net_flows(L, M, U, p.criteria, p.weights, 0.2, [1.0])
+    fr = fuzzy_promethee(L, M, U, p.criteria, p.weights)
+    crisp = promethee(p.X, p.criteria, p.weights)
+    np.testing.assert_allclose(fr["phi"][:, 1], crisp.phi, atol=1e-12)
+    np.testing.assert_allclose(fr["phi_plus"][:, 1], crisp.phi_plus, atol=1e-12)
+    assert np.all(fr["phi"][:, 0] <= fr["phi"][:, 1] + 1e-12)
+    assert np.all(fr["phi"][:, 1] <= fr["phi"][:, 2] + 1e-12)
+    np.testing.assert_allclose(fr["centroid"], fr["phi"].mean(axis=1))
+
+
+def test_f_promethee_crisp_input_gives_crisp_output():
+    p = Problem.from_json("data/problem.json")
+    fr = fuzzy_promethee(p.X, p.X, p.X, p.criteria, p.weights)
     crisp = promethee(p.X, p.criteria, p.weights).phi
-    np.testing.assert_allclose(lo[0], crisp, atol=1e-12)
-    np.testing.assert_allclose(hi[0], crisp, atol=1e-12)
+    for k in range(3):
+        np.testing.assert_allclose(fr["phi"][:, k], crisp, atol=1e-12)
 
 
-def test_f_promethee_bounds_contain_random_scenarios():
-    """Random matrices and weights inside the supports never leave the computed bounds."""
+def test_f_promethee_contains_random_scenarios():
+    """Any matrix inside the TFN supports gives phi within [l, u]."""
     p, L, M, U = _fuzzy_problem()
-    spread = 0.2
-    lo, hi = fuzzy_net_flows(L, M, U, p.criteria, p.weights, spread, [0.0])
-    m_best = min(guaranteed_margin(L, M, U, p.criteria, p.weights, spread, 0.0, 1, b)
-                 for b in (0, 2, 3))
+    fr = fuzzy_promethee(L, M, U, p.criteria, p.weights)
     rng = np.random.default_rng(5)
-    wl, wm, wu = triangular_weights(p.weights, spread)
-    for _ in range(3000):
-        X = rng.uniform(L, U)
-        w = rng.uniform(wl, wu)
-        w = w / w.sum()
-        if np.any(w < wl - 1e-12) or np.any(w > wu + 1e-12):
-            continue
-        phi = promethee(X, p.criteria, w).phi
-        assert np.all(phi >= lo[0] - 1e-9) and np.all(phi <= hi[0] + 1e-9)
-        assert min(phi[1] - phi[b] for b in (0, 2, 3)) >= m_best - 1e-6
+    for _ in range(2000):
+        phi = promethee(rng.uniform(L, U), p.criteria, p.weights).phi
+        assert np.all(phi >= fr["phi"][:, 0] - 1e-9) and np.all(phi <= fr["phi"][:, 2] + 1e-9)
 
 
-def test_extreme_linear_greedy():
-    c = np.array([3.0, 1.0, 2.0])
-    lo, hi = np.array([0.1, 0.1, 0.1]), np.array([0.5, 0.9, 0.5])
-    # max: fill c=3 up to 0.5, then c=2 up to 0.4 -> 0.5*3 + 0.1*1 + 0.4*2
-    assert extreme_linear(c, lo, hi, True) == pytest.approx(1.5 + 0.1 + 0.8)
-    # min: fill c=1 first up to 0.8 -> 0.1*3 + 0.8*1 + 0.1*2
-    assert extreme_linear(c, lo, hi, False) == pytest.approx(0.3 + 0.8 + 0.2)

@@ -198,9 +198,7 @@ Other weights keep their proportions. `best` = A2 Snapmaker U1.
 | thresholds x2 | 2 | 1 | 4 | 3 | 0.667 | A2 |
 | all 'usual' (type I) | 3 | 1 | 2 | 4 | 0.667 | A2 |
 
-### 5.4 F-PROMETHEE – fuzzy decision matrix (triangular fuzzy numbers)
-
-F-PROMETHEE: uncertain values of the decision matrix are triangular fuzzy numbers (low, value used, high); optionally the weights are fuzzy too.
+### 5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers
 
 Fuzzy decision matrix (l; m; u):
 
@@ -211,24 +209,14 @@ Fuzzy decision matrix (l; m; u):
 | A3 Bambu Lab H2D | (2019; 2125; 2231) | (47.1; 49.1; 51.1) | 1000 | 33.8 | (4.5; 5; 5) | 2 |
 | A4 Prusa CORE One | (1218; 1282; 1346) | (46; 48; 50) | 600 | 14.85 | (3.5; 4; 4.5) | 1 |
 
-| criterion | why uncertain |
-|---|---|
-| Price [EUR] | prices change from shop to shop (±5 %); the U1 price of 899 EUR is a sale price, normally 1099 EUR |
-| Noise [dB(A)] | noise values come from different sources (±2 dB); for the K2 Plus the manufacturer states 45 dB, the shop 50 dB |
-| Ease of use [1-5] | ease of use is my own subjective score (±0.5 point) |
+Fuzzy net flows φ~ = (l; m; u) and ranking by the centroid:
 
-Fuzzy net flows (α-cuts), defuzzified ranking and guaranteed winner:
-
-| alternative | case | φ α=0 min | φ α=0 max | φ α=0.5 min | φ α=0.5 max | φ α=1 (crisp) | defuzzified φ | rank (defuzzified) | min φ(A2) − φ(·) at α=0 | A2 guaranteed best from α |
-|---|---|---|---|---|---|---|---|---|---|---|
-| A1 Creality K2 Plus Combo | fuzzy values, crisp weights | -0.193 | +0.231 | -0.116 | +0.098 | -0.044 | -0.018 | 2 | -0.086 | +0.228 |
-| A2 Snapmaker U1 | fuzzy values, crisp weights | +0.070 | +0.449 | +0.179 | +0.373 | +0.295 | +0.278 | 1 | – | +0.228 |
-| A3 Bambu Lab H2D | fuzzy values, crisp weights | -0.210 | -0.010 | -0.136 | -0.039 | -0.059 | -0.081 | 3 | +0.099 | +0.228 |
-| A4 Prusa CORE One | fuzzy values, crisp weights | -0.347 | +0.010 | -0.250 | -0.110 | -0.192 | -0.179 | 4 | +0.112 | +0.228 |
-| A1 Creality K2 Plus Combo | fuzzy values + fuzzy weights ±20% | -0.261 | +0.323 | -0.145 | +0.134 | -0.044 | -0.014 | 2 | -0.240 | +0.433 |
-| A2 Snapmaker U1 | fuzzy values + fuzzy weights ±20% | -0.048 | +0.550 | +0.115 | +0.431 | +0.295 | +0.274 | 1 | – | +0.433 |
-| A3 Bambu Lab H2D | fuzzy values + fuzzy weights ±20% | -0.317 | +0.108 | -0.182 | +0.017 | -0.059 | -0.078 | 3 | -0.123 | +0.433 |
-| A4 Prusa CORE One | fuzzy values + fuzzy weights ±20% | -0.372 | +0.098 | -0.270 | -0.076 | -0.192 | -0.169 | 4 | -0.020 | +0.433 |
+| Alternative | φ l | φ m (= crisp φ) | φ u | centroid (l+m+u)/3 | F-PROMETHEE rank |
+|---|---|---|---|---|---|
+| A2 Snapmaker U1 | +0.070 | +0.295 | +0.449 | +0.271 | 1 |
+| A1 Creality K2 Plus Combo | -0.193 | -0.044 | +0.231 | -0.002 | 2 |
+| A3 Bambu Lab H2D | -0.210 | -0.059 | -0.010 | -0.093 | 3 |
+| A4 Prusa CORE One | -0.347 | -0.192 | +0.010 | -0.176 | 4 |
 
 ### 5.5 What-if: What if the Bambu Lab H2D goes on sale? (Task 1, section 6)
 

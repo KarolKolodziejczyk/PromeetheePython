@@ -274,46 +274,31 @@ Tutaj trzeba liczyć PROMETHEE od nowa, bo zmiana progów zmienia macierze P.
 
 ### 3.6 `promethee/fuzzy.py` – F-PROMETHEE (wymaganie 5a)
 
-Doktor wymaga, żeby **niektóre wartości z macierzy decyzyjnej** zastąpić
-liczbami rozmytymi tam, gdzie niepewność jest realna. Wybrałem:
-* **cenę**: ±5 %, a dla U1 (899; 899; 1099), bo 899 € to promocja;
-* **hałas**: ±2 dB, a dla K2 (45; 50; 52), bo producent podaje 45 dB;
-* **łatwość obsługi**: ±0.5, bo to moja subiektywna ocena.
+Niepewne wartości z macierzy to **trójkątne liczby rozmyte (l; m; u)**:
+* cena ±5 %, a dla U1 (899; 899; 1099), bo to promocja;
+* hałas ±2 dB, a dla K2 (45; 50; 52), bo producent podaje 45 dB;
+* łatwość obsługi ±0.5, bo to moja ocena.
 
-Funkcje:
-* `fuzzy_matrix`: buduje z ustawień w JSON trzy macierze L, M, U (minimum,
-  wartość, maksimum). M to zwykła macierz z Task 1.
-* `matrix_cut`: **α-przekrój**. Dla każdej wartości daje przedział
-  [L + α(M − L), U − α(U − M)]. Przy α = 1 to zwykłe dane, przy α = 0 cały
-  zakres niepewności.
-* `fuzzy_net_flows`: dla każdego α i każdej drukarki szuka **najmniejszego i
-  największego możliwego φ**. Trik: φ drukarki a jest **monotoniczne**, czyli
-  rośnie, gdy wartości a są lepsze, a wartości innych drukarek gorsze
-  (funkcje preferencji są niemalejące). Dlatego:
-  * max φ(a): a na dobrym końcu swoich przedziałów, reszta na złym;
-  * min φ(a): odwrotnie.
+Wagi zostają dokładne.
 
-  Wynik jest dokładny i nie wymaga losowania.
-* `triangular_weights`, `alpha_cut`, `extreme_linear`: to samo dla
-  **rozmytych wag** (±20 %). φ jest liniowe w wagach, więc najkorzystniejsze
-  wagi znajduje się zachłannie: zacznij od dolnych granic i „dosypuj” resztę
-  wagi tam, gdzie φⱼ jest najwyższe (dla max) albo najniższe (dla min).
-* `guaranteed_margin`: najmniejsza możliwa różnica φ(U1) − φ(b). U1 ustawiam
-  na złym końcu, b na dobrym, a pozostałe drukarki dobieram tak, żeby było
-  najgorzej dla U1 (osobno dla każdego kryterium, na gęstej siatce). Jeśli
-  wynik jest > 0, U1 wygrywa z b w każdym wiarygodnym przypadku.
-* `guaranteed_alpha`: od jakiego α U1 wygrywa na pewno:
-  * 0.23 przy rozmytych wartościach,
-  * 0.43 przy rozmytych wartościach i wagach.
-* `defuzzify`: zamienia rozmyty przepływ na jedną liczbę (średnia ze środków
-  przekrojów). Na tej podstawie powstaje ranking F-PROMETHEE: U1 > K2 > H2D
-  > Prusa.
+* `fuzzy_matrix`: buduje trzy macierze L, M, U (min, wartość, max). M to
+  zwykła macierz z Task 1.
+* `fuzzy_promethee`: zwykłe PROMETHEE, tylko **na trzech liczbach naraz**:
+  1. różnica: (a_l − b_u; a_m − b_m; a_u − b_l). Najmniejsza różnica to
+     najgorsze a minus najlepsze b;
+  2. preferencja: funkcja preferencji osobno na każdej z trzech różnic;
+  3. π~ = Σ wⱼ · P~ⱼ, wagi razy trójkąt;
+  4. φ⁺~ i φ⁻~ to średnie, a φ~ = φ⁺~ − φ⁻~ = (φ⁺_l − φ⁻_u; φ⁺_m − φ⁻_m; φ⁺_u − φ⁻_l);
+  5. ranking według **środka ciężkości** (l + m + u) / 3.
+
+  Wynik to **trójkąt** dla każdej drukarki, a środkowa liczba m to dokładnie
+  zwykłe φ.
 
 Testy:
-* przy α = 1 wynik równa się zwykłemu PROMETHEE;
-* 3000 losowych macierzy i wag z zakresu niepewności nigdy nie wychodzi poza
-  policzone granice;
-* algorytm zachłanny daje poprawny wynik na małym przykładzie.
+* m = zwykłe φ;
+* l ≤ m ≤ u;
+* dokładne dane dają dokładny wynik;
+* 2000 losowych macierzy z zakresu niepewności zawsze daje φ między l a u.
 
 ---
 
@@ -381,7 +366,7 @@ i fragment `results.md`.
 | `sensitivity: weights` | przedziały stabilności, wykresy wag, Monte Carlo | `weight_stability_intervals.csv`, `05_…`, `06_…` |
 | `sensitivity: thresholds` | skalowanie progów i wariant „usual” | `threshold_sensitivity.csv`, `07_…` |
 | `what-if` | cena H2D od 700 do 2500 € w 361 krokach; punkt zmiany zwycięzcy liczony interpolacją liniową (≈ 1096 €) | `what_if.csv`, `08_…` |
-| `F-PROMETHEE` | macierz TFN, rozmyte przepływy (same wartości oraz wartości + wagi ±20 %), ranking po defuzyfikacji, pewny zwycięzca | `fuzzy_decision_matrix.csv`, `fuzzy_promethee.csv`, `11_…` |
+| `F-PROMETHEE` | macierz TFN, trójkątne przepływy φ~ = (l; m; u), ranking według środka ciężkości | `fuzzy_decision_matrix.csv`, `fuzzy_promethee.csv`, `11_…` |
 | `efficiency` | φ korzyści i kosztu, zbiór efektywny (granica), wybór dla każdego budżetu, odporność | `efficiency*.csv`, `budget_choice.csv`, `09_…`, `10_…` |
 
 Funkcje pomocnicze:

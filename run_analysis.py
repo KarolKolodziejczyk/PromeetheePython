@@ -22,8 +22,7 @@ from promethee import (Problem, kendall_tau, promethee, promethee_I,  # noqa: E4
                        ranks_from_scores, spearman_rho, weighted_sum)
 from promethee.efficiency import (best_within_budget, budget_sweep,  # noqa: E402
                                   efficiency_acceptability, efficient_set, split_flows)
-from promethee.fuzzy import (defuzzify, fuzzy_matrix, fuzzy_net_flows,  # noqa: E402
-                             guaranteed_alpha, guaranteed_margin)
+from promethee.fuzzy import fuzzy_matrix, fuzzy_promethee  # noqa: E402
 from promethee.sensitivity import (monte_carlo, single_threshold_sweep,  # noqa: E402
                                    stability_intervals, threshold_sensitivity,
                                    weight_sweep)
@@ -390,75 +389,41 @@ def main(path: str):
     fz = pb.config.get("fuzzy")
     if fz:
         L, M, U = fuzzy_matrix(pb.X, pb.criteria, A, fz["values"])
-        fuzzy_cols = sorted({C.index(s["criterion"]) for s in fz["values"]})
+
         def _f(v):
             return f"{v:.0f}" if abs(v) >= 100 else f"{v:g}"
         tfn = pd.DataFrame({cnames[j]: [f"({_f(L[i, j])}; {_f(M[i, j])}; {_f(U[i, j])})"
-                                        if L[i, j] != U[i, j] else f"{M[i, j]:g}"
+                                        if L[i, j] != U[i, j] else f"{_f(M[i, j])}"
                                         for i in range(n)] for j in range(m)},
                            index=pb.labels)
         tfn.index.name = "Alternative"
         tfn.to_csv(OUT / "fuzzy_decision_matrix.csv")
-        why = pd.DataFrame({"criterion": [cnames[C.index(s["criterion"])] for s in fz["values"]],
-                            "why uncertain": [s.get("why", "") for s in fz["values"]]})
-        why = why.set_index("criterion")
-        ws = float(fz.get("weight_spread", 0.0))
-        cases = {"fuzzy values, crisp weights": 0.0}
-        if ws > 0:
-            cases[f"fuzzy values + fuzzy weights ±{ws:.0%}"] = ws
-        best = int(np.argmax(res.phi))
-        alphas = np.linspace(0, 1, 21)
-        rows, curves = [], {}
-        for cname, spread in cases.items():
-            lo, hi = fuzzy_net_flows(L, M, U, pb.criteria, pb.weights, spread, alphas)
-            curves[cname] = (lo, hi)
-            dz = defuzzify(lo, hi)
-            rk = ranks_from_scores(dz)
-            a_star = guaranteed_alpha(L, M, U, pb.criteria, pb.weights, spread, best)
-            for i in range(n):
-                rows.append({"case": cname, "alternative": pb.labels[i],
-                             "φ α=0 min": lo[0, i], "φ α=0 max": hi[0, i],
-                             "φ α=0.5 min": lo[10, i], "φ α=0.5 max": hi[10, i],
-                             "φ α=1 (crisp)": lo[-1, i], "defuzzified φ": dz[i],
-                             "rank (defuzzified)": int(rk[i]),
-                             f"min φ({A[best]}) − φ(·) at α=0": (
-                                 guaranteed_margin(L, M, U, pb.criteria, pb.weights, spread,
-                                                   0.0, best, i) if i != best else np.nan),
-                             f"{A[best]} guaranteed best from α": a_star})
-        fp = pd.DataFrame(rows).set_index("alternative")
+        fr = fuzzy_promethee(L, M, U, pb.criteria, pb.weights)
+        ph = fr["phi"]
+        fp = pd.DataFrame({"φ l": ph[:, 0], "φ m (= crisp φ)": ph[:, 1], "φ u": ph[:, 2],
+                           "centroid (l+m+u)/3": fr["centroid"],
+                           "F-PROMETHEE rank": ranks_from_scores(fr["centroid"])},
+                          index=pb.labels)
+        fp.index.name = "Alternative"
+        fp = fp.sort_values("F-PROMETHEE rank")
         fp.to_csv(OUT / "fuzzy_promethee.csv")
-        md += ["### 5.4 F-PROMETHEE – fuzzy decision matrix (triangular fuzzy numbers)\n",
-               fz.get("description", ""), "", "Fuzzy decision matrix (l; m; u):\n",
-               md_table(tfn), "", md_table(why), "",
-               "Fuzzy net flows (α-cuts), defuzzified ranking and guaranteed winner:\n",
+        md += ["### 5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers\n",
+               "Fuzzy decision matrix (l; m; u):\n", md_table(tfn), "",
+               "Fuzzy net flows φ~ = (l; m; u) and ranking by the centroid:\n",
                md_table(fp, "{:+.3f}"), ""]
 
-        fig, axes = plt.subplots(1, len(cases), figsize=(5.8 * len(cases), 3.9), sharey=True,
-                                 squeeze=False)
-        axes = axes.ravel()
-        for ax, (cname, spread) in zip(axes, cases.items()):
-            lo, hi = curves[cname]
-            for i, a in enumerate(A):
-                xs = np.concatenate([lo[:, i], hi[::-1, i]])
-                ys = np.concatenate([alphas, alphas[::-1]])
-                ax.fill(xs, ys, color=color[a], alpha=0.12, lw=0)
-                ax.plot(xs, ys, color=color[a], label=pb.labels[i])
-            a_star = guaranteed_alpha(L, M, U, pb.criteria, pb.weights, spread, best)
-            if 0 < a_star < 1:
-                ax.axhline(a_star, color=INK, lw=1, ls=":")
-                ax.text(ax.get_xlim()[0], a_star + 0.02, f" from α = {a_star:.2f}: "
-                        f"{pb.alt_names[best]} best for every plausible case", fontsize=8,
-                        color=INK)
-            elif a_star == 0:
-                ax.text(ax.get_xlim()[0], 0.03, f" {pb.alt_names[best]} best in every "
-                        "plausible case", fontsize=8, color=INK)
-            ax.set_xlabel("fuzzy net flow φ")
-            ax.set_title(cname, loc="left", fontsize=10)
-        axes[0].set_ylabel("membership α")
-        axes[-1].legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1))
-        fig.suptitle("F-PROMETHEE: fuzzy net flows (width at height α = range of φ for "
-                     "all values in the α-cut)", x=0.01, ha="left", fontweight="bold")
-        fig.tight_layout()
+        fig, ax = plt.subplots(figsize=(7.8, 3.6))
+        for i, a in enumerate(A):
+            xs, ys = [ph[i, 0], ph[i, 1], ph[i, 2]], [0, 1, 0]
+            ax.fill(xs, ys, color=color[a], alpha=0.15, lw=0)
+            ax.plot(xs, ys, color=color[a], label=pb.labels[i])
+            ax.plot([fr["centroid"][i]] * 2, [0, 0.06], color=color[a], lw=2.5)
+        ax.axvline(0, color=AXIS, lw=0.8)
+        ax.set_xlabel("fuzzy net flow φ~  (short tick = centroid)")
+        ax.set_ylabel("membership")
+        ax.set_ylim(0, 1.08)
+        ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1))
+        ax.set_title("F-PROMETHEE: fuzzy net flow of each printer (l; m; u)", loc="left")
         save(fig, "11_f_promethee.png")
 
     # --------------------------------------------- what-if: one performance

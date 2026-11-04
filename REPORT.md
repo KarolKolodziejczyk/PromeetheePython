@@ -246,64 +246,44 @@ printers swap places can be computed exactly.
 
 ### 5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers
 
-Some values of my decision matrix are not certain. I replaced them with
-**triangular fuzzy numbers (TFN)** (l; m; u): m is the value used so far, and
-l and u are the lowest and highest plausible values. The uncertainty comes
-from my own notes in Task 1:
+Uncertain values of the decision matrix are replaced by **triangular fuzzy
+numbers (TFN) (l; m; u)**, where m is the value used so far:
 
-| Criterion | Fuzzy values | Why uncertain |
+| Criterion | TFN | Why uncertain |
 |---|---|---|
-| Price | ±5 % for all printers; **U1: (899; 899; 1099)** | prices differ between shops; 899 € for U1 is a sale price, normally 1099 € |
-| Noise | ±2 dB for all printers; **K2 Plus: (45; 50; 52)** | values come from different sources; for the K2 Plus the manufacturer states 45 dB, the shop 50 dB |
-| Ease of use | ±0.5 point (within 1–5) | my own subjective score |
-| Speed, volume, nozzles | crisp | manufacturer specifications |
+| Price | ±5 %; **U1: (899; 899; 1099)** | prices differ between shops; 899 € for U1 is a sale price, normally 1099 € |
+| Noise | ±2 dB; **K2 Plus: (45; 50; 52)** | values from different sources; the manufacturer states 45 dB for the K2 Plus |
+| Ease of use | ±0.5 point | my own subjective score |
 
-**How F-PROMETHEE is computed**
-* An **α-cut** of a TFN is the interval of values plausible at least to
-  degree α:
-  * α = 1 gives only m, i.e. the crisp problem;
-  * α = 0 gives the whole range [l, u].
-* For every α (0, 0.05, …, 1) I compute the **smallest and the largest
-  possible net flow** of every printer over all decision matrices inside the
-  α-cuts. This set of intervals is the **fuzzy net flow** of the printer.
-* This is exact, because the net flow is monotone. φ(a) is largest when a's
-  own values are at the good end of their intervals and every other printer's
-  values are at the bad end, and smallest in the opposite case.
-* In a second case the **weights are fuzzy as well** (±20 %:
-  (0.8w; w; 1.2w)). Because φ is linear in the weights, the extreme weights
-  are found exactly with a small linear programme.
-* To check whether U1 *certainly* wins, I compute the smallest possible
-  φ(U1) − φ(b) over everything plausible at level α. If it is positive for
-  every b, U1 beats all printers in every plausible case at that α.
-* Ranking: each fuzzy net flow is defuzzified as the average of its α-cut
-  midpoints.
+Speed, volume and nozzles stay crisp (manufacturer data); weights stay crisp.
+
+**Method (TFN arithmetic, cf. Goumas & Lygerou, 2000).** Every PROMETHEE step
+is done on the three numbers (l; m; u):
+1. difference: d~ = a~ − b~ = (a_l − b_u; a_m − b_m; a_u − b_l);
+2. preference: P~ = (P(d_l); P(d_m); P(d_u));
+3. index: π~(a,b) = Σⱼ wⱼ P~ⱼ(a,b);
+4. flows: φ⁺~, φ⁻~ as averages, and φ~ = φ⁺~ − φ⁻~ = (φ⁺_l − φ⁻_u; φ⁺_m − φ⁻_m; φ⁺_u − φ⁻_l);
+5. ranking by the centroid (l + m + u)/3.
 
 ![F-PROMETHEE](results/figures/11_f_promethee.png)
 
-| Printer | φ crisp (α = 1) | φ range α = 0, fuzzy values | defuzzified φ | φ range α = 0, fuzzy values + weights ±20 % | defuzzified φ |
-|---|---|---|---|---|---|
-| A2 Snapmaker U1 | +0.295 | [+0.070, +0.449] | **+0.278** | [−0.048, +0.550] | **+0.274** |
-| A1 Creality K2 Plus | −0.044 | [−0.193, +0.231] | −0.018 | [−0.261, +0.323] | −0.014 |
-| A3 Bambu Lab H2D | −0.059 | [−0.210, −0.010] | −0.081 | [−0.317, +0.108] | −0.078 |
-| A4 Prusa CORE One | −0.192 | [−0.347, +0.010] | −0.179 | [−0.372, +0.098] | −0.169 |
+| Rank | Printer | φ~ = (l; m; u) | centroid |
+|---|---|---|---|
+| 1 | A2 Snapmaker U1 | (+0.070; +0.295; +0.449) | **+0.271** |
+| 2 | A1 Creality K2 Plus | (−0.193; −0.044; +0.231) | −0.002 |
+| 3 | A3 Bambu Lab H2D | (−0.210; −0.059; −0.010) | −0.093 |
+| 4 | A4 Prusa CORE One | (−0.347; −0.192; +0.010) | −0.176 |
 
-* **The F-PROMETHEE ranking is the same as the crisp one: U1 ≻ K2 Plus ≻
-  H2D ≻ CORE One**, in both cases. The uncertainty does not change the
-  recommendation.
-* **U1 has the only fuzzy net flow that stays positive** over the whole
-  support (fuzzy values case).
-* **Defuzzified U1 is slightly lower than crisp U1** (0.278 vs 0.295). Its
-  price TFN is one-sided (899 → 1099 €): the price can only go up.
-* **Guaranteed winner:**
-  * with fuzzy values, U1 beats every printer in every plausible case for
-    **α ≥ 0.23**;
-  * with fuzzy values and fuzzy weights, for **α ≥ 0.43**.
-* **Where U1 could lose:** only at the bottom of the TFNs, when the K2 Plus
-  is as quiet as the manufacturer claims (45 dB) *and* U1 costs its regular
-  1099 €. Even then this needs the most unfavourable values on all uncertain
-  criteria at once.
-* **The K2 Plus has the widest fuzzy flow.** Its noise value has the
-  largest uncertainty, 45–52 dB.
+* **The F-PROMETHEE ranking is the same as the crisp ranking.** The middle
+  value m is exactly the crisp φ.
+* **U1 is the only printer whose whole triangle is positive** (l = +0.070).
+  Even in the worst plausible case it is better than average.
+* **U1's centroid is a bit lower than its crisp φ** (0.271 vs 0.295). Its price
+  can only go up from the sale price.
+* **The K2 Plus has the widest triangle.** Its noise value is the most
+  uncertain (45–52 dB). Its upper end overlaps U1's lower part, so only in
+  the most unfavourable combination (K2 at 45 dB, U1 at 1099 €) could the
+  K2 Plus come close to U1.
 
 ### 5.5 What if the Bambu H2D goes on sale? (continues Task 1, Section 6)
 
@@ -430,8 +410,8 @@ Share of random weight vectors (20 000) for which each printer is efficient:
    * It stays first for ±20 % weight uncertainty (100 %), ±50 % (97 %), and
      every threshold variant.
    * F-PROMETHEE gives the same ranking with uncertain prices, noise values
-     and ease-of-use scores. U1 is the guaranteed winner from α = 0.23 (from
-     α = 0.43 with fuzzy weights as well).
+     and ease-of-use scores. U1 is the only printer whose whole fuzzy net
+     flow is positive.
 
    **My Task 1 guess and the WSM result are confirmed by PROMETHEE.**
 2. **Why U1 wins:** my two most important criteria, price (0.30) and nozzles

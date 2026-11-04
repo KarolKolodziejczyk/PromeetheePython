@@ -85,11 +85,8 @@ Rozszerzenie **Efficiency measuring**:
 - `best_within_budget` / `budget_sweep`: najlepsza drukarka, na jaką stać mnie przy danym budżecie (odczyt z granicy efektywności)
 """,
     "promethee/fuzzy.py": """
-**F-PROMETHEE**: niepewne wartości w macierzy (cena, hałas, łatwość) to **trójkątne liczby rozmyte** (min; wartość; max).
-- `fuzzy_matrix`: buduje macierz TFN z ustawień w JSON
-- `fuzzy_net_flows`: dla każdego α liczy **najmniejsze i największe φ**. Trik: φ drukarki rośnie, gdy jej wartości są lepsze, a cudze gorsze, więc wystarczy wziąć skrajne końce przedziałów
-- `extreme_linear`: to samo dla rozmytych wag (dokładnie, „dosypywanie” wagi)
-- `guaranteed_alpha`: od jakiego α U1 wygrywa **na pewno**
+**F-PROMETHEE** na trójkątnych liczbach rozmytych (l; m; u). Każdy krok PROMETHEE liczę na trzech liczbach naraz:
+różnica → preferencja → π → φ⁺, φ⁻ → **φ~ = (l; m; u)**, a ranking robię według środka ciężkości (l+m+u)/3.
 """,
     "run_analysis.py": """
 Skrypt „dyrygent”: wczytuje JSON, woła funkcje z `promethee/` sekcja po sekcji
@@ -196,19 +193,14 @@ Czyli: **H2D to obiektywnie najmocniejsza drukarka, U1 wygrywa przez moje priory
     note("Progi q, p to moja subiektywna decyzja, więc sprawdzam: mnożę wszystkie ×0.25 … ×2 → **U1 zawsze 1.** Zmieniają się tylko miejsca 2–3."),
     show("5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers", csv="fuzzy_decision_matrix.csv"),
     note("""
-**Wymaganie 5a (F-PROMETHEE).** Niepewne wartości z Task 1 zamieniam na **trójkątne liczby rozmyte (min; wartość; max)**:
-- **cena** ±5% (różne sklepy); **U1: (899; 899; 1099)**, bo 899 € to cena promocyjna, normalnie 1099 €
-- **hałas** ±2 dB (różne źródła); **K2: (45; 50; 52)**, bo Creality podaje 45 dB, a sklep 50 dB
-- **łatwość obsługi** ±0.5 (moja subiektywna ocena)
-- prędkość, objętość, dysze zostają dokładne (dane producenta)
+Niepewne wartości jako trójkąty **(min; wartość; max)**: cena ±5% (U1: 899–1099 €, promocja),
+hałas ±2 dB (K2: producent podaje 45 dB), łatwość ±0.5 (moja ocena). Reszta bez zmian.
 """),
     show("F-PROMETHEE – fuzzy net flows", "11_f_promethee.png", "fuzzy_promethee.csv"),
     note("""
-**Jak czytać:** α = 1 (czubek) = dokładne wartości → zwykłe φ; α = 0 (podstawa) = cały zakres niepewności.
-Szerokość kształtu na wysokości α = od najgorszego do najlepszego możliwego φ drukarki.
-- **Ranking po defuzyfikacji** (średnia ze środków przekrojów): **U1 > K2 > H2D > Prusa**, taki sam jak bez niepewności
-- same rozmyte wartości: U1 wygrywa **na pewno od α ≈ 0.23**; poniżej K2 mogłaby wygrać (gdy K2 ma 45 dB, a U1 kosztuje 1099 €)
-- rozmyte wartości **i** wagi ±20%: U1 na pewno wygrywa od α ≈ 0.43
+Każdy krok PROMETHEE liczę na trzech liczbach (l; m; u), więc wynik to też trójkąt. **m = zwykłe φ.**
+Ranking według środka ciężkości (l+m+u)/3: **U1 > K2 > H2D > Prusa**, taki sam jak bez niepewności.
+U1 to jedyna drukarka z całym trójkątem po dodatniej stronie (l = +0.07).
 """),
     show("5.5 What if the Bambu H2D goes on sale?", "08_what_if.png", "what_if.csv"),
     note("""
