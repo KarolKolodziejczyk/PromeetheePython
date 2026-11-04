@@ -209,14 +209,16 @@ Fuzzy decision matrix (l; m; u):
 | A3 Bambu Lab H2D | (2019; 2125; 2231) | (47.1; 49.1; 51.1) | 1000 | 33.8 | (4.5; 5; 5) | 2 |
 | A4 Prusa CORE One | (1218; 1282; 1346) | (46; 48; 50) | 600 | 14.85 | (3.5; 4; 4.5) | 1 |
 
+Weights are TFNs too: (0.9·w; w; 1.1·w).
+
 Fuzzy net flows φ~ = (l; m; u) and ranking by the centroid:
 
 | Alternative | φ l | φ m (= crisp φ) | φ u | centroid (l+m+u)/3 | F-PROMETHEE rank |
 |---|---|---|---|---|---|
-| A2 Snapmaker U1 | +0.070 | +0.295 | +0.449 | +0.271 | 1 |
-| A1 Creality K2 Plus Combo | -0.193 | -0.044 | +0.231 | -0.002 | 2 |
-| A3 Bambu Lab H2D | -0.210 | -0.059 | -0.010 | -0.093 | 3 |
-| A4 Prusa CORE One | -0.347 | -0.192 | +0.010 | -0.176 | 4 |
+| A2 Snapmaker U1 | +0.005 | +0.295 | +0.518 | +0.273 | 1 |
+| A1 Creality K2 Plus Combo | -0.252 | -0.044 | +0.286 | -0.004 | 2 |
+| A3 Bambu Lab H2D | -0.277 | -0.059 | +0.063 | -0.091 | 3 |
+| A4 Prusa CORE One | -0.404 | -0.192 | +0.062 | -0.178 | 4 |
 
 ### 5.5 What-if: What if the Bambu Lab H2D goes on sale? (Task 1, section 6)
 

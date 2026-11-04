@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from promethee import Criterion, Problem, promethee, promethee_I, kendall_tau
+from promethee import Criterion, Problem, promethee, promethee_I, kendall_tau, preference_matrices
 from promethee.core import PREFERENCE_FUNCTIONS
 from promethee.sensitivity import phi_with_weight, stability_intervals, monte_carlo
 from promethee.core import weighted_sum
@@ -106,7 +106,7 @@ def _fuzzy_problem():
 
 def test_f_promethee_middle_is_crisp_and_triangles_are_ordered():
     p, L, M, U = _fuzzy_problem()
-    fr = fuzzy_promethee(L, M, U, p.criteria, p.weights)
+    fr = fuzzy_promethee(L, M, U, p.criteria, p.weights, 0.1)
     crisp = promethee(p.X, p.criteria, p.weights)
     np.testing.assert_allclose(fr["phi"][:, 1], crisp.phi, atol=1e-12)
     np.testing.assert_allclose(fr["phi_plus"][:, 1], crisp.phi_plus, atol=1e-12)
@@ -124,12 +124,18 @@ def test_f_promethee_crisp_input_gives_crisp_output():
 
 
 def test_f_promethee_contains_random_scenarios():
-    """Any matrix inside the TFN supports gives phi within [l, u]."""
+    """Any matrix and weights inside the TFN supports give phi within [l, u]."""
     p, L, M, U = _fuzzy_problem()
-    fr = fuzzy_promethee(L, M, U, p.criteria, p.weights)
+    fr = fuzzy_promethee(L, M, U, p.criteria, p.weights, 0.1)
     rng = np.random.default_rng(5)
     for _ in range(2000):
-        phi = promethee(rng.uniform(L, U), p.criteria, p.weights).phi
+        w = p.weights * rng.uniform(0.9, 1.1, size=len(p.weights))
+        # un-normalised weights inside the fuzzy supports, as in the TFN product
+        X = rng.uniform(L, U)
+        P = preference_matrices(X, p.criteria)
+        pi = np.tensordot(w, P, axes=1)
+        n = len(X)
+        phi = (pi.sum(axis=1) - pi.sum(axis=0)) / (n - 1)
         assert np.all(phi >= fr["phi"][:, 0] - 1e-9) and np.all(phi <= fr["phi"][:, 2] + 1e-9)
 
 

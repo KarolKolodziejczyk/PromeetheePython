@@ -195,12 +195,13 @@ Czyli: **H2D to obiektywnie najmocniejsza drukarka, U1 wygrywa przez moje priory
     note("""
 Niepewne wartości jako trójkąty **(min; wartość; max)**: cena ±5% (U1: 899–1099 €, promocja),
 hałas ±2 dB (K2: producent podaje 45 dB), łatwość ±0.5 (moja ocena). Reszta bez zmian.
+Wagi też są trójkątami: **±10%**, np. cena (0.27; 0.30; 0.33).
 """),
     show("F-PROMETHEE – fuzzy net flows", "11_f_promethee.png", "fuzzy_promethee.csv"),
     note("""
 Każdy krok PROMETHEE liczę na trzech liczbach (l; m; u), więc wynik to też trójkąt. **m = zwykłe φ.**
 Ranking według środka ciężkości (l+m+u)/3: **U1 > K2 > H2D > Prusa**, taki sam jak bez niepewności.
-U1 to jedyna drukarka z całym trójkątem po dodatniej stronie (l = +0.07).
+U1 to jedyna drukarka z całym trójkątem po dodatniej stronie (l = +0.005).
 """),
     show("5.5 What if the Bambu H2D goes on sale?", "08_what_if.png", "what_if.csv"),
     note("""

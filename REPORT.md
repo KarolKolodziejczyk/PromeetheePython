@@ -255,13 +255,14 @@ numbers (TFN) (l; m; u)**, where m is the value used so far:
 | Noise | ±2 dB; **K2 Plus: (45; 50; 52)** | values from different sources; the manufacturer states 45 dB for the K2 Plus |
 | Ease of use | ±0.5 point | my own subjective score |
 
-Speed, volume and nozzles stay crisp (manufacturer data); weights stay crisp.
+Speed, volume and nozzles stay crisp (manufacturer data). The **weights are
+fuzzy too, ±10 %**: w~ = (0.9w; w; 1.1w), e.g. price (0.27; 0.30; 0.33).
 
 **Method (TFN arithmetic, cf. Goumas & Lygerou, 2000).** Every PROMETHEE step
 is done on the three numbers (l; m; u):
 1. difference: d~ = a~ − b~ = (a_l − b_u; a_m − b_m; a_u − b_l);
 2. preference: P~ = (P(d_l); P(d_m); P(d_u));
-3. index: π~(a,b) = Σⱼ wⱼ P~ⱼ(a,b);
+3. index: π~(a,b) = Σⱼ w~ⱼ ⊗ P~ⱼ(a,b) = (Σ wⱼ,l Pⱼ,l; Σ wⱼ Pⱼ,m; Σ wⱼ,u Pⱼ,u);
 4. flows: φ⁺~, φ⁻~ as averages, and φ~ = φ⁺~ − φ⁻~ = (φ⁺_l − φ⁻_u; φ⁺_m − φ⁻_m; φ⁺_u − φ⁻_l);
 5. ranking by the centroid (l + m + u)/3.
 
@@ -269,16 +270,16 @@ is done on the three numbers (l; m; u):
 
 | Rank | Printer | φ~ = (l; m; u) | centroid |
 |---|---|---|---|
-| 1 | A2 Snapmaker U1 | (+0.070; +0.295; +0.449) | **+0.271** |
-| 2 | A1 Creality K2 Plus | (−0.193; −0.044; +0.231) | −0.002 |
-| 3 | A3 Bambu Lab H2D | (−0.210; −0.059; −0.010) | −0.093 |
-| 4 | A4 Prusa CORE One | (−0.347; −0.192; +0.010) | −0.176 |
+| 1 | A2 Snapmaker U1 | (+0.005; +0.295; +0.518) | **+0.273** |
+| 2 | A1 Creality K2 Plus | (−0.252; −0.044; +0.286) | −0.004 |
+| 3 | A3 Bambu Lab H2D | (−0.277; −0.059; +0.063) | −0.091 |
+| 4 | A4 Prusa CORE One | (−0.404; −0.192; +0.062) | −0.178 |
 
 * **The F-PROMETHEE ranking is the same as the crisp ranking.** The middle
   value m is exactly the crisp φ.
-* **U1 is the only printer whose whole triangle is positive** (l = +0.070).
+* **U1 is the only printer whose whole triangle is positive** (l = +0.005).
   Even in the worst plausible case it is better than average.
-* **U1's centroid is a bit lower than its crisp φ** (0.271 vs 0.295). Its price
+* **U1's centroid is a bit lower than its crisp φ** (0.273 vs 0.295). Its price
   can only go up from the sale price.
 * **The K2 Plus has the widest triangle.** Its noise value is the most
   uncertain (45–52 dB). Its upper end overlaps U1's lower part, so only in

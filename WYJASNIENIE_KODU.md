@@ -279,7 +279,7 @@ Niepewne wartości z macierzy to **trójkątne liczby rozmyte (l; m; u)**:
 * hałas ±2 dB, a dla K2 (45; 50; 52), bo producent podaje 45 dB;
 * łatwość obsługi ±0.5, bo to moja ocena.
 
-Wagi zostają dokładne.
+Wagi też są trójkątami, ±10 %: (0.9w; w; 1.1w), np. cena (0.27; 0.30; 0.33).
 
 * `fuzzy_matrix`: buduje trzy macierze L, M, U (min, wartość, max). M to
   zwykła macierz z Task 1.
@@ -287,7 +287,8 @@ Wagi zostają dokładne.
   1. różnica: (a_l − b_u; a_m − b_m; a_u − b_l). Najmniejsza różnica to
      najgorsze a minus najlepsze b;
   2. preferencja: funkcja preferencji osobno na każdej z trzech różnic;
-  3. π~ = Σ wⱼ · P~ⱼ, wagi razy trójkąt;
+  3. π~ = Σ w~ⱼ · P~ⱼ, czyli trójkąt wagi razy trójkąt preferencji:
+     dolna × dolna, środkowa × środkowa, górna × górna;
   4. φ⁺~ i φ⁻~ to średnie, a φ~ = φ⁺~ − φ⁻~ = (φ⁺_l − φ⁻_u; φ⁺_m − φ⁻_m; φ⁺_u − φ⁻_l);
   5. ranking według **środka ciężkości** (l + m + u) / 3.
 

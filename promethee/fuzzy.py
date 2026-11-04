@@ -9,7 +9,8 @@ TFN arithmetic (cf. Goumas & Lygerou, 2000):
 
 1. fuzzy difference      d~ = a~ - b~ = (a_l - b_u,  a_m - b_m,  a_u - b_l)
 2. fuzzy preference      P~ = (P(d_l), P(d_m), P(d_u))   (sorted, so l <= m <= u)
-3. fuzzy index           pi~(a,b) = sum_j w_j P~_j(a,b)          (crisp weights)
+3. fuzzy index           pi~(a,b) = sum_j w~_j P~_j(a,b),  w~_j = (w_j (1-s), w_j, w_j (1+s))
+                         (TFN product of positive numbers: (w_l P_l, w_m P_m, w_u P_u))
 4. fuzzy flows           phi+~ = mean_b pi~(a,b),   phi-~ = mean_b pi~(b,a)
 5. fuzzy net flow        phi~ = phi+~ - phi-~ = (phi+_l - phi-_u, phi+_m - phi-_m, phi+_u - phi-_l)
 6. ranking               centroid (l + m + u) / 3
@@ -42,10 +43,12 @@ def fuzzy_matrix(X: np.ndarray, criteria: list[Criterion], alt_ids: list[str], s
     return L, M, U
 
 
-def fuzzy_promethee(L, M, U, criteria: list[Criterion], w):
-    """F-PROMETHEE II. Returns dict with TFN arrays of shape (n, 3) = (l, m, u):
+def fuzzy_promethee(L, M, U, criteria: list[Criterion], w, w_spread: float = 0.0):
+    """F-PROMETHEE II. Weights are TFNs (w(1-s), w, w(1+s)) with s = w_spread.
+    Returns dict with TFN arrays of shape (n, 3) = (l, m, u):
     'pi' (n, n, 3), 'phi_plus', 'phi_minus', 'phi', and 'centroid' (n,)."""
     w = normalise(w)
+    wt = np.stack([w * (1 - w_spread), w, w * (1 + w_spread)], axis=1)  # (m, 3)
     n, m = L.shape
     pi = np.zeros((n, n, 3))
     for j, c in enumerate(criteria):
@@ -54,7 +57,7 @@ def fuzzy_promethee(L, M, U, criteria: list[Criterion], w):
                 if a == b:
                     continue
                 d = np.array([L[a, j] - U[b, j], M[a, j] - M[b, j], U[a, j] - L[b, j]])
-                pi[a, b] += w[j] * np.sort(c.preference(d))
+                pi[a, b] += wt[j] * np.sort(c.preference(d))
     phi_plus = pi.sum(axis=1) / (n - 1)
     phi_minus = pi.sum(axis=0) / (n - 1)
     phi = np.stack([phi_plus[:, 0] - phi_minus[:, 2],

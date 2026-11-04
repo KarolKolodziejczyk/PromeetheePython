@@ -398,7 +398,8 @@ def main(path: str):
                            index=pb.labels)
         tfn.index.name = "Alternative"
         tfn.to_csv(OUT / "fuzzy_decision_matrix.csv")
-        fr = fuzzy_promethee(L, M, U, pb.criteria, pb.weights)
+        ws = float(fz.get("weight_spread", 0.0))
+        fr = fuzzy_promethee(L, M, U, pb.criteria, pb.weights, ws)
         ph = fr["phi"]
         fp = pd.DataFrame({"φ l": ph[:, 0], "φ m (= crisp φ)": ph[:, 1], "φ u": ph[:, 2],
                            "centroid (l+m+u)/3": fr["centroid"],
@@ -409,6 +410,7 @@ def main(path: str):
         fp.to_csv(OUT / "fuzzy_promethee.csv")
         md += ["### 5.4 F-PROMETHEE – uncertain values as triangular fuzzy numbers\n",
                "Fuzzy decision matrix (l; m; u):\n", md_table(tfn), "",
+               f"Weights are TFNs too: ({1 - ws:g}·w; w; {1 + ws:g}·w).\n",
                "Fuzzy net flows φ~ = (l; m; u) and ranking by the centroid:\n",
                md_table(fp, "{:+.3f}"), ""]
 
